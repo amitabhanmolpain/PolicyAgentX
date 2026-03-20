@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 240 7% 4%; /* #0B0B0C */
+    --foreground: 0 0% 100%; /* #FFFFFF */
+
+    --card: 240 5% 8%; /* #151517 */
+    --card-foreground: 0 0% 100%; /* #FFFFFF */
+
+    --popover: 240 5% 8%; /* #151517 */
+    --popover-foreground: 0 0% 100%; /* #FFFFFF */
+
+    --primary: 0 0% 100%; /* #FFFFFF */
+    --primary-foreground: 0 0% 0%; /* #000000 */
+
+    --secondary: 240 6% 7%; /* #111113 */
+    --secondary-foreground: 240 5% 65%; /* #A1A1AA */
+
+    --muted: 240 6% 7%; /* #111113 */
+    --muted-foreground: 240 5% 46%; /* #71717A */
+
+    --accent: 239 84% 67%; /* #6366F1 - Indigo */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%; /* #EF4444 */
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 71% 45%; /* #22C55E */
+    --success-foreground: 0 0% 100%;
+
+    --border: 240 6% 13%; /* #1F1F23 */
+    --input: 240 6% 7%; /* #111113 */
+    --ring: 239 84% 67% / 0.2;
+
+    --radius: 1rem;
+
+    --font-display: 'Inter', sans-serif;
+    --font-body: 'Inter', sans-serif;
+
+    --sidebar-background: 240 7% 4%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 240 6% 13%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 240 6% 13%;
+    --sidebar-ring: 239 84% 67%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground selection:bg-accent/30 selection:text-white;
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    @apply tracking-tight;
+  }
+}
+
+@layer components {
+  .glass {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 8px 32px -10px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Redefine glow classes for the new theme */
+  .glow-card-hover {
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.05), 0 8px 32px -10px rgba(0, 0, 0, 0.5);
+  }
+
+  .text-gradient {
+    background: linear-gradient(to bottom right, #FFFFFF 0%, #A1A1AA 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite linear;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .premium-input {
+    @apply bg-secondary border-border text-white px-4 py-2 rounded-lg transition-all duration-300;
+    @apply focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40;
+  }
+
+  .premium-button-primary {
+    @apply bg-primary text-primary-foreground px-6 py-2 rounded-xl font-medium transition-all duration-300;
+    @apply hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(255,255,255,0.1)];
+    @apply active:scale-[0.98];
+  }
+
+  .premium-button-secondary {
+    @apply bg-secondary text-foreground px-6 py-2 border border-border rounded-xl font-medium transition-all duration-300;
+    @apply hover:bg-[#1A1A1D] hover:scale-[1.02];
+    @apply active:scale-[0.98];
+  }
+
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    opacity: 0.02;
+    pointer-events: none;
+  }
+
+  .bg-radial-glow {
+    background: radial-gradient(circle at 50% -20%, rgba(99, 102, 241, 0.05), transparent 70%);
+  }
+}
+
