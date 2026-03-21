@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import GlowCard from "@/components/GlowCard";
+import ChatMessageList from "@/components/ChatMessageList";
+import ChatInput from "@/components/ChatInput";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -31,6 +33,12 @@ interface ResultItem {
   positive: boolean;
 }
 
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
+
 const SimulatePolicyPage = () => {
   const [policyType, setPolicyType] = useState(policyTypes[0]);
   const [value, setValue] = useState(50);
@@ -38,6 +46,26 @@ const SimulatePolicyPage = () => {
   const [duration, setDuration] = useState(12);
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "initial-ai",
+      role: "assistant",
+      content: "Hello! I am your Policy Simulation Assistant. Specify a policy, region, and duration, and I'll analyze the socio-economic impacts for you."
+    }
+  ]);
+
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when messages or results change
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior: "smooth"
+      });
+    }
+  }, [messages, loading, showResults]);
 
   const results: ResultItem[] = [
     { label: "Inflation Impact", value: "-0.6%", change: "Decreased", positive: true },
@@ -46,185 +74,160 @@ const SimulatePolicyPage = () => {
     { label: "Public Sentiment", value: "72%", change: "Favorable", positive: true },
   ];
 
-  const handleSimulate = () => {
-    setLoading(true);
+  const handleSendMessage = (content: string) => {
+    // Add user message
+    const userMsg: Message = { id: Date.now().toString(), role: "user", content };
+    setMessages(prev => [...prev, userMsg]);
     setShowResults(false);
+    setLoading(true);
+
+    // Parse input (existing logic)
+    const lower = content.toLowerCase();
+    let extractedType = policyType;
+    if (lower.includes("tax")) extractedType = "Tax Reform";
+    else if (lower.includes("subsidy")) extractedType = "Subsidy Program";
+    else if (lower.includes("trade")) extractedType = "Trade Policy";
+    else if (lower.includes("monetary")) extractedType = "Monetary Policy";
+    else if (lower.includes("environ")) extractedType = "Environmental Regulation";
+
+    let extractedRegion = region;
+    if (lower.includes("india") || lower.includes("karnataka") || lower.includes("asia")) extractedRegion = "Asia Pacific";
+    else if (lower.includes("america") || lower.includes("usa")) extractedRegion = "North America";
+    else if (lower.includes("europe") || lower.includes("uk")) extractedRegion = "Europe";
+    else if (lower.includes("africa")) extractedRegion = "Africa";
+    else if (lower.includes("middle east")) extractedRegion = "Middle East";
+    else if (lower.includes("south america")) extractedRegion = "South America";
+
+    let extractedValue = value;
+    const valMatch = lower.match(/(\d+)%/);
+    if (valMatch) extractedValue = parseInt(valMatch[1]);
+
+    let extractedDuration = duration;
+    const durMatch = lower.match(/(\d+)\s+month/);
+    if (durMatch) extractedDuration = parseInt(durMatch[1]);
+
+    setPolicyType(extractedType);
+    setValue(extractedValue);
+    setRegion(extractedRegion);
+    setDuration(extractedDuration);
+
     setTimeout(() => {
       setLoading(false);
-      setShowResults(true);
+      const aiMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: `Analyzing ${extractedType} policy for ${extractedRegion} with a ${extractedValue}% change over ${extractedDuration} months. Here are the simulated impacts based on our current economic models:`
+      };
+      setMessages(prev => [...prev, aiMsg]);
+      
+      setTimeout(() => {
+        setShowResults(true);
+      }, 500);
     }, 2000);
   };
 
   const labelClass = "text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-semibold mb-3 block";
 
   return (
-    <div className="container mx-auto px-8 py-20 max-w-6xl">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-16 text-center"
-      >
-        <h1 className="text-4xl md:text-5xl font-display font-bold text-gradient mb-4 tracking-tight">
-          Policy Simulation
+    <div className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-background relative">
+      {/* Dynamic Header */}
+      <div className="flex-none pt-8 pb-4 text-center border-b border-border/10 bg-background/50 backdrop-blur-md z-40">
+        <h1 className="text-2xl md:text-3xl font-display font-bold text-gradient tracking-tight">
+          Policy Agent X
         </h1>
-        <p className="text-secondary-foreground font-light tracking-wide max-w-xl mx-auto leading-relaxed">
-          Configure parameters to simulate complex socio-economic impacts across diverse regions.
+        <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.2em] mt-1 opacity-60">
+          Intelligent Research Assistant
         </p>
-      </motion.div>
+      </div>
 
-      {/* Form */}
-      <GlowCard hoverable={false} className="max-w-4xl mx-auto mb-24 p-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-          <div>
-            <label className={labelClass}>Policy Type</label>
-            <select value={policyType} onChange={(e) => setPolicyType(e.target.value)} className="premium-input w-full appearance-none">
-              {policyTypes.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelClass}>Region</label>
-            <select value={region} onChange={(e) => setRegion(e.target.value)} className="premium-input w-full appearance-none">
-              {regions.map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelClass}>Policy Value: <span className="text-white ml-2">{value}%</span></label>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={value}
-              onChange={(e) => setValue(Number(e.target.value))}
-              className="w-full accent-white h-1.5 bg-secondary rounded-lg cursor-pointer"
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Duration (months)</label>
-            <input
-              type="number"
-              min={1}
-              max={120}
-              value={duration}
-              onChange={(e) => setDuration(Number(e.target.value))}
-              className="premium-input w-full"
-            />
-          </div>
-        </div>
+      {/* Main Scroller Area */}
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-4 md:px-0 scroll-smooth"
+      >
+        <div className="max-w-4xl mx-auto w-full py-8 md:py-12 flex flex-col gap-10 pb-[280px]">
+          <ChatMessageList messages={messages} loading={loading} />
 
-        <button
-          onClick={handleSimulate}
-          disabled={loading}
-          className="mt-12 w-full premium-button-primary disabled:opacity-50 tracking-[0.2em] py-4 text-xs font-bold uppercase transition-all"
-        >
-          {loading ? (
-            <span className="flex items-center justify-center gap-3">
-              <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-              Processing...
-            </span>
-          ) : (
-            "Run Simulation"
-          )}
-        </button>
-      </GlowCard>
-
-      {/* Results */}
-      <AnimatePresence>
-        {showResults && (
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 30 }}
-            transition={{ duration: 0.8, ease: "circOut" }}
-          >
-            <div className="flex items-center gap-4 mb-12 overflow-hidden">
-               <div className="h-px bg-border flex-1" />
-               <h2 className="text-xs font-display font-medium text-muted-foreground uppercase tracking-[0.3em]">Simulation Results</h2>
-               <div className="h-px bg-border flex-1" />
-            </div>
-
-            {/* Result cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-              {results.map((r, i) => (
-                <GlowCard
-                  key={r.label}
-                  delay={i * 0.1}
-                  className="text-center p-8"
-                >
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-[0.15em] mb-4 font-semibold">{r.label}</p>
-                  <p className={`text-4xl font-display font-bold tracking-tighter mb-2 ${r.positive ? "text-emerald-400" : "text-rose-400"}`}>
-                    {r.value}
-                  </p>
-                  <div className={`text-[10px] uppercase font-bold tracking-widest ${r.positive ? "text-emerald-500/80" : "text-rose-500/80"}`}>
-                    {r.change}
-                  </div>
-                </GlowCard>
-              ))}
-            </div>
-
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <GlowCard hoverable={false} className="p-8">
-                <div className="flex items-center justify-between mb-8">
-                  <p className={labelClass + " mb-0"}>Trend Analysis</p>
-                  <div className="flex gap-4">
-                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-white"/><span className="text-[10px] text-muted-foreground uppercase">GDP</span></div>
-                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#8B5CF6]"/><span className="text-[10px] text-muted-foreground uppercase">INF</span></div>
-                  </div>
+          <AnimatePresence>
+            {showResults && (
+              <motion.div
+                ref={resultsRef}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 30 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="space-y-12 pt-12 border-t border-border/20"
+              >
+                <div className="flex items-center gap-4 px-4 overflow-hidden">
+                   <div className="h-px bg-border/40 flex-1" />
+                   <h2 className="text-[10px] font-display font-medium text-muted-foreground uppercase tracking-[0.4em]">Simulation Intelligence Model</h2>
+                   <div className="h-px bg-border/40 flex-1" />
                 </div>
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={trendData}>
-                    <CartesianGrid strokeDasharray="8 8" stroke="#1F1F23" vertical={false} />
-                    <XAxis dataKey="month" stroke="#71717A" fontSize={10} tickLine={false} axisLine={false} tick={{dy: 10}} />
-                    <YAxis stroke="#71717A" fontSize={10} tickLine={false} axisLine={false} tick={{dx: -10}} />
-                    <Tooltip
-                      contentStyle={{
-                        background: "#151517",
-                        border: "1px solid #1F1F23",
-                        borderRadius: "16px",
-                        boxShadow: "0 20px 40px -10px rgba(0,0,0,0.5)",
-                        color: "#FFFFFF",
-                        fontSize: 11,
-                        padding: "12px 16px",
-                        fontWeight: 500,
-                      }}
-                      itemStyle={{ padding: "2px 0" }}
-                      cursor={{ stroke: '#1F1F23', strokeWidth: 2 }}
-                    />
-                    <Line type="monotone" dataKey="gdp" stroke="#FFFFFF" strokeWidth={2.5} dot={false} animationDuration={2000} />
-                    <Line type="monotone" dataKey="inflation" stroke="#8B5CF6" strokeWidth={2.5} dot={false} animationDuration={2500} />
-                    <Line type="monotone" dataKey="employment" stroke="#6366F1" strokeWidth={2.5} dot={false} animationDuration={3000} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </GlowCard>
 
-              <GlowCard hoverable={false} className="p-8">
-                <p className={labelClass}>Impact Comparison</p>
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={comparisonData}>
-                    <CartesianGrid strokeDasharray="8 8" stroke="#1F1F23" vertical={false} />
-                    <XAxis dataKey="name" stroke="#71717A" fontSize={10} tickLine={false} axisLine={false} tick={{dy: 10}} />
-                    <YAxis stroke="#71717A" fontSize={10} tickLine={false} axisLine={false} tick={{dx: -10}} />
-                    <Tooltip
-                      contentStyle={{
-                        background: "#151517",
-                        border: "1px solid #1F1F23",
-                        borderRadius: "16px",
-                        boxShadow: "0 20px 40px -10px rgba(0,0,0,0.5)",
-                        color: "#FFFFFF",
-                        fontSize: 11,
-                        padding: "12px 16px",
-                        fontWeight: 500,
-                      }}
-                      cursor={{ fill: 'rgba(255,255,255,0.03)' }}
-                    />
-                    <Bar dataKey="value" fill="#FFFFFF" radius={[6, 6, 0, 0]} barSize={40} animationDuration={1500} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </GlowCard>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-2 md:px-0">
+                  {results.map((r, i) => (
+                    <GlowCard
+                      key={r.label}
+                      delay={i * 0.05}
+                      className="text-center p-6 bg-secondary/20 border-border/30 backdrop-blur-sm"
+                    >
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-[0.1em] mb-3 font-bold opacity-70">{r.label}</p>
+                      <p className={`text-4xl font-display font-bold tracking-tighter mb-1 ${r.positive ? "text-emerald-400" : "text-rose-400"}`}>
+                        {r.value}
+                      </p>
+                      <div className={`text-[10px] uppercase font-bold tracking-widest ${r.positive ? "text-emerald-500/60" : "text-rose-500/60"}`}>
+                        {r.change}
+                      </div>
+                    </GlowCard>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 px-2 md:px-0 pb-16">
+                  <GlowCard hoverable={false} className="p-8 bg-secondary/10 border-border/20">
+                    <div className="flex items-center justify-between mb-8">
+                      <p className={labelClass + " mb-0"}>Trend Analysis</p>
+                      <div className="flex gap-4">
+                        <div className="flex items-center gap-1.5 font-bold"><div className="w-1.5 h-1.5 rounded-full bg-white"/><span className="text-[9px] text-muted-foreground uppercase">GDP</span></div>
+                        <div className="flex items-center gap-1.5 font-bold"><div className="w-1.5 h-1.5 rounded-full bg-accent"/><span className="text-[9px] text-muted-foreground uppercase">INF</span></div>
+                      </div>
+                    </div>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <LineChart data={trendData}>
+                        <CartesianGrid strokeDasharray="8 8" stroke="#1F1F23" vertical={false} />
+                        <XAxis dataKey="month" stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dy: 10}} />
+                        <YAxis stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dx: -10}} />
+                        <Tooltip contentStyle={{ background: "#0B0B0C", border: "1px solid #1F1F23", borderRadius: "12px", fontSize: 10 }} />
+                        <Line type="monotone" dataKey="gdp" stroke="#FFFFFF" strokeWidth={2.5} dot={false} />
+                        <Line type="monotone" dataKey="inflation" stroke="#6366F1" strokeWidth={2.5} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </GlowCard>
+
+                  <GlowCard hoverable={false} className="p-8 bg-secondary/10 border-border/20">
+                    <p className={labelClass}>Impact Comparison</p>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <BarChart data={comparisonData}>
+                        <CartesianGrid strokeDasharray="8 8" stroke="#1F1F23" vertical={false} />
+                        <XAxis dataKey="name" stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dy: 10}} />
+                        <YAxis stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dx: -10}} />
+                        <Tooltip contentStyle={{ background: "#0B0B0C", border: "1px solid #1F1F23", borderRadius: "12px", fontSize: 10 }} />
+                        <Bar dataKey="value" fill="#FFFFFF" radius={[4, 4, 0, 0]} barSize={40} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </GlowCard>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* Input Overlay */}
+      <div className="fixed bottom-0 left-0 right-0 z-[100] pointer-events-none">
+        <div className="max-w-4xl mx-auto w-full px-4 md:px-0 pb-8 pointer-events-auto bg-gradient-to-t from-background via-background to-transparent pt-24">
+          <ChatInput onSendMessage={handleSendMessage} isLoading={loading} />
+        </div>
+      </div>
     </div>
   );
 };
