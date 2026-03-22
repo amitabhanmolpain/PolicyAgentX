@@ -46,11 +46,11 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
   };
 
   return (
-    <div className="flex-none p-4 md:p-8 pt-0 w-full max-w-4xl mx-auto">
+    <div className="flex-none w-full max-w-3xl mx-auto px-2 md:px-3 pt-0 pb-1">
       <div 
         className={cn(
-          "relative bg-secondary/80 border-border border rounded-3xl p-3 pt-4 transition-all duration-300",
-          isFocused ? "shadow-[0_0_20px_rgba(255,255,255,0.05)] border-accent/60 bg-secondary" : "shadow-xl"
+          "relative bg-secondary/80 rounded-[28px] px-2.5 pt-2.5 pb-2 transition-all duration-300",
+          isFocused ? "shadow-[0_0_20px_rgba(255,255,255,0.05)] bg-secondary" : "shadow-xl"
         )}
       >
         <div className="relative">
@@ -61,8 +61,8 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
             onKeyDown={handleKeyDown}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            rows={2}
-            className="w-full bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-white placeholder-transparent resize-none py-1 px-4 leading-relaxed font-light"
+            rows={1}
+            className="w-full min-h-[42px] max-h-28 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-white placeholder-transparent resize-none py-2 px-3 text-sm leading-relaxed font-light"
           />
           
           <AnimatePresence mode="wait">
@@ -73,7 +73,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
                 animate={{ opacity: 0.4, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.5 }}
-                className="absolute inset-x-0 top-1 left-4 pointer-events-none text-muted-foreground text-sm font-light select-none whitespace-nowrap overflow-hidden text-ellipsis"
+                className="absolute inset-x-0 top-2 left-3 pointer-events-none text-muted-foreground text-xs font-light select-none whitespace-nowrap overflow-hidden text-ellipsis"
               >
                 {placeholders[placeholderIndex]}
               </motion.div>
@@ -81,10 +81,10 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
           </AnimatePresence>
         </div>
 
-        <div className="flex items-center justify-between mt-3 px-2">
+        <div className="flex items-center justify-between mt-1.5 px-1">
           <div className="flex items-center gap-1">
             <UploadButton disabled={isLoading} />
-            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold ml-2">PDF Enabled</span>
+            <span className="hidden sm:inline text-[9px] text-muted-foreground uppercase tracking-widest font-semibold ml-1.5">PDF Enabled</span>
           </div>
 
           <Button
@@ -92,7 +92,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
             disabled={!value.trim() || isLoading}
             size="icon"
             className={cn(
-              "rounded-xl w-10 h-10 transition-all duration-300", 
+              "rounded-xl w-9 h-9 transition-all duration-300", 
               value.trim() ? "bg-accent hover:bg-accent/80 text-white scale-100" : "bg-secondary text-muted-foreground scale-95 opacity-50"
             )}
           >
@@ -100,7 +100,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
           </Button>
         </div>
       </div>
-      <p className="text-center text-[10px] text-muted-foreground mt-4 uppercase tracking-[0.2em] font-semibold opacity-50">
+      <p className="text-center text-[9px] text-muted-foreground mt-2 uppercase tracking-[0.18em] font-semibold opacity-45">
         AI ASSISTANT POWERED BY POLICYAGENTX CORE
       </p>
     </div>

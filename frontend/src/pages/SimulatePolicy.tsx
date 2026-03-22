@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import GlowCard from "@/components/GlowCard";
 import ChatMessageList from "@/components/ChatMessageList";
@@ -55,18 +55,6 @@ const SimulatePolicyPage = () => {
   ]);
 
   const resultsRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll to bottom when messages or results change
-  useEffect(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTo({
-        top: scrollContainerRef.current.scrollHeight,
-        behavior: "smooth"
-      });
-    }
-  }, [messages, loading, showResults]);
-
   const results: ResultItem[] = [
     { label: "Inflation Impact", value: "-0.6%", change: "Decreased", positive: true },
     { label: "GDP Impact", value: "+1.1%", change: "Growth", positive: true },
@@ -129,9 +117,9 @@ const SimulatePolicyPage = () => {
   const labelClass = "text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-semibold mb-3 block";
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-background relative">
+    <div className="flex flex-col min-h-[calc(100vh-64px)] w-full bg-background relative">
       {/* Dynamic Header */}
-      <div className="flex-none pt-8 pb-4 text-center border-b border-border/10 bg-background/50 backdrop-blur-md z-40">
+      <div className="flex-none pt-8 pb-4 text-center bg-background/50 backdrop-blur-md z-40">
         <h1 className="text-2xl md:text-3xl font-display font-bold text-gradient tracking-tight">
           Policy Agent X
         </h1>
@@ -141,11 +129,8 @@ const SimulatePolicyPage = () => {
       </div>
 
       {/* Main Scroller Area */}
-      <div 
-        ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-4 md:px-0 scroll-smooth"
-      >
-        <div className="max-w-4xl mx-auto w-full py-8 md:py-12 flex flex-col gap-10 pb-[280px]">
+      <div className="flex-1 px-4 md:px-0">
+        <div className="max-w-4xl mx-auto w-full py-8 md:py-12 flex flex-col gap-10 pb-[150px]">
           <ChatMessageList messages={messages} loading={loading} />
 
           <AnimatePresence>
@@ -224,7 +209,7 @@ const SimulatePolicyPage = () => {
 
       {/* Input Overlay */}
       <div className="fixed bottom-0 left-0 right-0 z-[100] pointer-events-none">
-        <div className="max-w-4xl mx-auto w-full px-4 md:px-0 pb-8 pointer-events-auto bg-gradient-to-t from-background via-background to-transparent pt-24">
+        <div className="max-w-3xl mx-auto w-full px-2 md:px-3 pb-2 md:pb-3 pointer-events-auto bg-gradient-to-t from-background to-transparent pt-8">
           <ChatInput onSendMessage={handleSendMessage} isLoading={loading} />
         </div>
       </div>

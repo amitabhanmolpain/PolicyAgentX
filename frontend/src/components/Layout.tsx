@@ -6,6 +6,7 @@ import { useLocation } from "react-router-dom";
 
 const Layout = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
+  const hideFooter = location.pathname === "/simulate-policy";
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -22,7 +23,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
           {children}
         </motion.main>
       </AnimatePresence>
-      <Footer />
+      {!hideFooter && <Footer />}
     </div>
 
   );
