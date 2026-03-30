@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import GlowCard from "@/components/GlowCard";
 import { Clock, MapPin, TrendingUp, X } from "lucide-react";
 import { getHistory, SimulationResult } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface HistoryItem {
   id?: number;
@@ -23,6 +24,7 @@ const HistoryPage = () => {
   const [historyData, setHistoryData] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<HistoryItem | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -31,6 +33,12 @@ const HistoryPage = () => {
         setHistoryData(data);
       } catch (error) {
         console.error("Failed to fetch history:", error);
+        const errorMessage = error instanceof Error ? error.message : "Failed to load history";
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: errorMessage,
+        });
         setHistoryData([]);
       } finally {
         setLoading(false);
@@ -38,7 +46,7 @@ const HistoryPage = () => {
     };
 
     fetchHistory();
-  }, []);
+  }, [toast]);
 
   return (
     <div className="container mx-auto px-8 py-20 max-w-5xl">

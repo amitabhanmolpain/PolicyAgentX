@@ -4,6 +4,7 @@ import GlowCard from "@/components/GlowCard";
 import ChatMessageList from "@/components/ChatMessageList";
 import ChatInput from "@/components/ChatInput";
 import { simulatePolicy, SimulationResult } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -58,6 +59,7 @@ const SimulatePolicyPage = () => {
 
   const resultsRef = useRef<HTMLDivElement>(null);
   const [apiResults, setApiResults] = useState<SimulationResult | null>(null);
+  const { toast } = useToast();
 
   const handleSendMessage = async (content: string) => {
     // Add user message
@@ -168,6 +170,12 @@ const SimulatePolicyPage = () => {
       }
 
       console.error("Policy simulation error:", errorMessage);
+      
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: errorMessage,
+      });
       
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
