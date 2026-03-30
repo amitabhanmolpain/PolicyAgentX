@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 
 const navItems = [
   { path: "/", label: "Home" },
@@ -10,15 +11,31 @@ const navItems = [
 
 const Header = () => {
   const location = useLocation();
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 50) {
+        setIsScrolled(true);
+      } else {
+        setIsScrolled(false);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
     <motion.header
-      initial={{ y: -80 }}
-      animate={{ y: 0 }}
+      initial={{ y: -80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="fixed top-0 left-0 right-0 z-50 bg-background/60 backdrop-blur-xl border-b border-border/80 h-20"
+      className={`fixed z-50 bg-background/80 backdrop-blur-md border border-border/60 h-20 rounded-2xl shadow-2xl shadow-black/20 transition-all duration-300 ${
+        isScrolled ? "top-6 left-20 right-20" : "top-4 left-4 right-4"
+      }`}
     >
-      <div className="container mx-auto flex items-center justify-between h-full px-8">
+      <div className="container mx-auto flex items-center justify-between h-full px-8 max-w-7xl">
         <Link to="/" className="font-display text-xl font-bold text-gradient tracking-tighter">
           PolicyAgentX
         </Link>

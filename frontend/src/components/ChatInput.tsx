@@ -7,9 +7,9 @@ import UploadButton from "./UploadButton";
 import { cn } from "@/lib/utils";
 
 const placeholders = [
-  "Increase fuel tax by 5% in Karnataka for 12 months",
-  "Subsidy on agriculture by 10% in India",
-  "Reduce GST by 2% for 6 months",
+  "🇮🇳 Increase fuel tax by 5% in Karnataka...",
+  "🇮🇳 Subsidy on agriculture by 10% in India...",
+  "🇮🇳 Reduce GST by 2% for essential exports...",
 ];
 
 interface ChatInputProps {

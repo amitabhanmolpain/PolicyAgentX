@@ -18,7 +18,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -15 }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="flex-1 pt-20"
+          className="flex-1 pt-28"
         >
           {children}
         </motion.main>

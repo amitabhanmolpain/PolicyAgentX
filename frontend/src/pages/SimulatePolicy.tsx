@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import GlowCard from "@/components/GlowCard";
 import ChatMessageList from "@/components/ChatMessageList";
 import ChatInput from "@/components/ChatInput";
+import { simulatePolicy, SimulationResult } from "@/lib/api";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -46,6 +47,7 @@ const SimulatePolicyPage = () => {
   const [duration, setDuration] = useState(12);
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [showIndiaWarning, setShowIndiaWarning] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "initial-ai",
@@ -55,22 +57,45 @@ const SimulatePolicyPage = () => {
   ]);
 
   const resultsRef = useRef<HTMLDivElement>(null);
-  const results: ResultItem[] = [
-    { label: "Inflation Impact", value: "-0.6%", change: "Decreased", positive: true },
-    { label: "GDP Impact", value: "+1.1%", change: "Growth", positive: true },
-    { label: "Employment Change", value: "+1.1%", change: "Improvement", positive: true },
-    { label: "Public Sentiment", value: "72%", change: "Favorable", positive: true },
-  ];
+  const [apiResults, setApiResults] = useState<SimulationResult | null>(null);
 
-  const handleSendMessage = (content: string) => {
+  const handleSendMessage = async (content: string) => {
     // Add user message
     const userMsg: Message = { id: Date.now().toString(), role: "user", content };
     setMessages(prev => [...prev, userMsg]);
     setShowResults(false);
     setLoading(true);
 
-    // Parse input (existing logic)
+    // Check if policy is for India
+    const indiaKeywords = [
+      "india", "indian", "delhi", "mumbai", "bangalore", "karnataka", 
+      "maharashtra", "tamil nadu", "west bengal", "uttar pradesh",
+      "delhi ncr", "kolkata", "hyderabad", "pune", "rupee", "crore",
+      "lakh", "gst", "pib", "ministry", "parliament", "lok sabha",
+      "rajya sabha", "indian government", "indian economy", "indian rupee",
+      "reserve bank", "rbi", "nifty", "sensex", "india budget",
+      "indian policy", "central government", "state government"
+    ];
+    
     const lower = content.toLowerCase();
+    const isIndiaPolicy = indiaKeywords.some(keyword => lower.includes(keyword));
+
+    if (!isIndiaPolicy) {
+      setLoading(false);
+      setShowIndiaWarning(true);
+      
+      const warningMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "⚠️ PolicyAgentX is specifically designed for Indian government policies only. Please provide an Indian policy for analysis (e.g., policies related to India, Indian states, or Indian economic indicators)."
+      };
+      setMessages(prev => [...prev, warningMsg]);
+      
+      setTimeout(() => setShowIndiaWarning(false), 5000);
+      return;
+    }
+
+    // Parse input (existing logic)
     let extractedType = policyType;
     if (lower.includes("tax")) extractedType = "Tax Reform";
     else if (lower.includes("subsidy")) extractedType = "Subsidy Program";
@@ -99,19 +124,58 @@ const SimulatePolicyPage = () => {
     setRegion(extractedRegion);
     setDuration(extractedDuration);
 
-    setTimeout(() => {
+    try {
+      // Call backend API
+      console.log("Sending policy simulation request...");
+      const result = await simulatePolicy({
+        text: content,
+        region: extractedRegion,
+      });
+
+      if (!result) {
+        throw new Error("No response received from server");
+      }
+
+      setApiResults(result);
       setLoading(false);
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `Analyzing ${extractedType} policy for ${extractedRegion} with a ${extractedValue}% change over ${extractedDuration} months. Here are the simulated impacts based on our current economic models:`
+        content: `Analyzing ${extractedType} policy for ${extractedRegion}. Here are the simulated impacts:`
       };
       setMessages(prev => [...prev, aiMsg]);
       
       setTimeout(() => {
         setShowResults(true);
       }, 500);
-    }, 2000);
+    } catch (error) {
+      setLoading(false);
+      
+      let errorMessage = "Failed to simulate policy. Please try again.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes("PolicyAgentX is specifically designed for Indian")) {
+          errorMessage = "⚠️ " + error.message;
+        } else if (error.message.includes("fetch")) {
+          errorMessage = "Backend connection failed. Is the Flask server running on http://localhost:5000?";
+        } else if (error.message.includes("JSON")) {
+          errorMessage = "Backend returned invalid response. Check server logs.";
+        } else if (error.message.includes("HTTP Error")) {
+          errorMessage = `Server error: ${error.message}`;
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      console.error("Policy simulation error:", errorMessage);
+      
+      const errorMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: `Error: ${errorMessage}`
+      };
+      setMessages(prev => [...prev, errorMsg]);
+    }
   };
 
   const labelClass = "text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-semibold mb-3 block";
@@ -120,11 +184,16 @@ const SimulatePolicyPage = () => {
     <div className="flex flex-col min-h-[calc(100vh-64px)] w-full bg-background relative">
       {/* Dynamic Header */}
       <div className="flex-none pt-8 pb-4 text-center bg-background/50 backdrop-blur-md z-40">
-        <h1 className="text-2xl md:text-3xl font-display font-bold text-gradient tracking-tight">
-          Policy Agent X
-        </h1>
+        <div className="flex items-center justify-center gap-3 mb-2">
+          <h1 className="text-2xl md:text-3xl font-display font-bold text-gradient tracking-tight">
+            Policy Agent X
+          </h1>
+          <span className="px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/50 text-orange-400 text-[10px] font-bold uppercase tracking-[0.1em]">
+            🇮🇳 India Only
+          </span>
+        </div>
         <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.2em] mt-1 opacity-60">
-          Intelligent Research Assistant
+          Intelligent Research Assistant for Indian Policies
         </p>
       </div>
 
@@ -150,19 +219,21 @@ const SimulatePolicyPage = () => {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-2 md:px-0">
-                  {results.map((r, i) => (
+                  {apiResults && [
+                    { label: "Economic Impact", value: apiResults.economic_impact || "N/A", positive: true },
+                    { label: "Social Impact", value: apiResults.social_impact || "N/A", positive: true },
+                    { label: "Business Impact", value: apiResults.business_impact || "N/A", positive: true },
+                    { label: "Government Impact", value: apiResults.government_impact || "N/A", positive: true },
+                  ].map((r, i) => (
                     <GlowCard
                       key={r.label}
                       delay={i * 0.05}
                       className="text-center p-6 bg-secondary/20 border-border/30 backdrop-blur-sm"
                     >
                       <p className="text-[9px] text-muted-foreground uppercase tracking-[0.1em] mb-3 font-bold opacity-70">{r.label}</p>
-                      <p className={`text-4xl font-display font-bold tracking-tighter mb-1 ${r.positive ? "text-emerald-400" : "text-rose-400"}`}>
+                      <p className={`text-2xl md:text-4xl font-display font-bold tracking-tighter mb-1 text-emerald-400 break-words`}>
                         {r.value}
                       </p>
-                      <div className={`text-[10px] uppercase font-bold tracking-widest ${r.positive ? "text-emerald-500/60" : "text-rose-500/60"}`}>
-                        {r.change}
-                      </div>
                     </GlowCard>
                   ))}
                 </div>
