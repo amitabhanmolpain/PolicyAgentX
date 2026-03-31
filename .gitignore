@@ -46,6 +46,32 @@ lerna-debug.log*
 .env.local
 .env.*.local
 
+# GCP Credentials
+google-cloud-credentials.json
+service-account-key.json
+*.p12
+*.pem
+GOOGLE_APPLICATION_CREDENTIALS
+
+# ChromaDB & Vector Store
+chroma_policy_db/
+*.bin
+*.parquet
+chroma-collections/
+
+# RAG System Generated Files
+backend/rag/__pycache__/
+backend/rag/*.pyc
+backend/rag_cache/
+embeddings_cache/
+
+# Large Data Files
+*.csv
+*.xlsx
+*.pdf
+data/
+datasets/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -67,3 +93,28 @@ logs/
 # IDE
 .vscode/*
 !.vscode/extensions.json
+
+# Vertex AI & ML Models
+models/
+*.model
+*.pkl
+*.joblib
+huggingface-cache/
+
+# MongoDB Local
+mongodb_data/
+mongo_local/
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+*~
+
+# Node build
+frontend/dist/
+frontend/build/
+
+# Backend build
+backend/build/
+backend/dist/
