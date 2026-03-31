@@ -286,7 +286,7 @@ const SimulatePolicyPage = () => {
                    <div className="h-px bg-border/40 flex-1" />
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-2 md:px-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-2 md:px-0">
                   {apiResults && [
                     { label: "Economic Impact", value: apiResults.economic_impact || "N/A", positive: true },
                     { label: "Social Impact", value: apiResults.social_impact || "N/A", positive: true },
@@ -296,12 +296,21 @@ const SimulatePolicyPage = () => {
                     <GlowCard
                       key={r.label}
                       delay={i * 0.05}
-                      className="text-center p-6 bg-secondary/20 border-border/30 backdrop-blur-sm"
+                      className="p-10 bg-secondary/20 border border-border/50 backdrop-blur-sm min-h-[340px] flex flex-col justify-start"
                     >
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-[0.1em] mb-3 font-bold opacity-70">{r.label}</p>
-                      <p className={`text-2xl md:text-4xl font-display font-bold tracking-tighter mb-1 text-emerald-400 break-words`}>
-                        {r.value}
-                      </p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-[0.15em] mb-6 font-bold opacity-80">{r.label}</p>
+                      <div className="space-y-3">
+                        {r.value.split('\n').map((line, idx) => {
+                          const cleanLine = line.trim();
+                          if (!cleanLine) return null;
+                          return (
+                            <div key={idx} className="flex gap-3">
+                              <span className="text-emerald-400 font-bold text-sm flex-shrink-0">•</span>
+                              <p className="text-xs text-emerald-300 leading-relaxed break-words">{cleanLine}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </GlowCard>
                   ))}
                 </div>
