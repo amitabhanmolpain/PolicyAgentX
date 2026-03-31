@@ -4,6 +4,7 @@ from app.models.db_model import policy_collection
 from bson import ObjectId
 import traceback
 import json
+from datetime import datetime
 
 
 def make_json_serializable(obj):
@@ -76,6 +77,7 @@ def handle_simulation(data):
         final_result = {
             "policy_text": policy.text,
             "region": policy.region,
+            "timestamp": datetime.now().isoformat(),
             "economic_impact": str(economic_data.get("economic_analysis", "")),
             "social_impact": str(social_data.get("social_analysis", "")),
             "business_impact": str(business_data.get("business_analysis", "")),

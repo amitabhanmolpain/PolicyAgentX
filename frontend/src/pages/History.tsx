@@ -8,8 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 interface HistoryItem {
   id?: number;
   text?: string;
+  policy_text?: string;
   region?: string;
   date?: string;
+  timestamp?: string;
   economic_impact?: string;
   social_impact?: string;
   business_impact?: string;
@@ -30,7 +32,13 @@ const HistoryPage = () => {
     const fetchHistory = async () => {
       try {
         const data = await getHistory();
-        setHistoryData(data);
+        // Sort by timestamp (newest first)
+        const sortedData = data.sort((a, b) => {
+          const dateA = new Date(a.timestamp || 0).getTime();
+          const dateB = new Date(b.timestamp || 0).getTime();
+          return dateB - dateA;
+        });
+        setHistoryData(sortedData);
       } catch (error) {
         console.error("Failed to fetch history:", error);
         const errorMessage = error instanceof Error ? error.message : "Failed to load history";
@@ -80,15 +88,16 @@ const HistoryPage = () => {
                   <div className="inline-flex items-center px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-[10px] font-bold text-accent uppercase tracking-widest mb-3">
                     Policy Simulation
                   </div>
-                  <div className="flex items-center gap-6 mt-1 text-xs text-muted-foreground font-medium">
+                  <p className="text-sm text-white font-medium mb-2 line-clamp-2">{item.policy_text || "Policy simulation"}</p>
+                  <div className="flex items-center gap-6 mt-3 text-xs text-muted-foreground font-medium">
                     {item.region && <span className="flex items-center gap-2"><MapPin className="w-4 h-4 opacity-50" />{item.region}</span>}
-                    {item.date && <span className="flex items-center gap-2"><Clock className="w-4 h-4 opacity-50" />{item.date}</span>}
+                    {item.timestamp && <span className="flex items-center gap-2"><Clock className="w-4 h-4 opacity-50" />{new Date(item.timestamp).toLocaleDateString()} {new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-8">
                   <div className="text-right">
-                     <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1 font-semibold">Economic Impact</p>
-                     <p className="text-lg font-display font-bold text-white tracking-tighter truncate max-w-xs">{item.economic_impact || "N/A"}</p>
+                     <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1 font-semibold">Status</p>
+                     <p className="text-lg font-display font-bold text-emerald-400 tracking-tighter">✓ Analyzed</p>
                   </div>
                 </div>
               </div>

@@ -1,10 +1,12 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import GlowCard from "@/components/GlowCard";
 import ChatMessageList from "@/components/ChatMessageList";
 import ChatInput from "@/components/ChatInput";
 import { simulatePolicy, SimulationResult } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { RotateCcw } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -49,24 +51,72 @@ const SimulatePolicyPage = () => {
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [showIndiaWarning, setShowIndiaWarning] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "initial-ai",
-      role: "assistant",
-      content: "Hello! I am your Policy Simulation Assistant. Specify a policy, region, and duration, and I'll analyze the socio-economic impacts for you."
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   const resultsRef = useRef<HTMLDivElement>(null);
   const [apiResults, setApiResults] = useState<SimulationResult | null>(null);
   const { toast } = useToast();
 
+  // Load messages from localStorage on mount
+  useEffect(() => {
+    const savedMessages = localStorage.getItem("policySimulationChat");
+    if (savedMessages) {
+      try {
+        setMessages(JSON.parse(savedMessages));
+      } catch {
+        // If parsing fails, use default message
+        setMessages([
+          {
+            id: "initial-ai",
+            role: "assistant",
+            content: "Hello! I am your Policy Simulation Assistant. Specify a policy, region, and duration, and I'll analyze the socio-economic impacts for you."
+          }
+        ]);
+      }
+    } else {
+      setMessages([
+        {
+          id: "initial-ai",
+          role: "assistant",
+          content: "Hello! I am your Policy Simulation Assistant. Specify a policy, region, and duration, and I'll analyze the socio-economic impacts for you."
+        }
+      ]);
+    }
+  }, []);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem("policySimulationChat", JSON.stringify(messages));
+  }, [messages]);
+
+  const handleNewChat = () => {
+    localStorage.removeItem("policySimulationChat");
+    setMessages([
+      {
+        id: "initial-ai",
+        role: "assistant",
+        content: "Hello! I am your Policy Simulation Assistant. Specify a policy, region, and duration, and I'll analyze the socio-economic impacts for you."
+      }
+    ]);
+    setShowResults(false);
+    setApiResults(null);
+  };
+
   const handleSendMessage = async (content: string) => {
+    setShowResults(false);
+    setLoading(true);
+
     // Add user message
     const userMsg: Message = { id: Date.now().toString(), role: "user", content };
     setMessages(prev => [...prev, userMsg]);
-    setShowResults(false);
-    setLoading(true);
+
+    // Add thinking indicator
+    const thinkingMsg: Message = {
+      id: `thinking-${Date.now()}`,
+      role: "assistant",
+      content: "🔄 Analyzing policy with AI agents..."
+    };
+    setMessages(prev => [...prev, thinkingMsg]);
 
     // Check if policy is for India
     const indiaKeywords = [
@@ -143,9 +193,9 @@ const SimulatePolicyPage = () => {
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `Analyzing ${extractedType} policy for ${extractedRegion}. Here are the simulated impacts:`
+        content: `✅ Analysis Complete!\nAnalyzing ${extractedType} policy for ${extractedRegion}. Here are the simulated impacts:`
       };
-      setMessages(prev => [...prev, aiMsg]);
+      setMessages(prev => prev.filter(m => !m.id.startsWith("thinking-")).concat([aiMsg]));
       
       setTimeout(() => {
         setShowResults(true);
@@ -180,9 +230,9 @@ const SimulatePolicyPage = () => {
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `Error: ${errorMessage}`
+        content: `❌ Error: ${errorMessage}`
       };
-      setMessages(prev => [...prev, errorMsg]);
+      setMessages(prev => prev.filter(m => !m.id.startsWith("thinking-")).concat([errorMsg]));
     }
   };
 
@@ -199,6 +249,16 @@ const SimulatePolicyPage = () => {
           <span className="px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/50 text-orange-400 text-[10px] font-bold uppercase tracking-[0.1em]">
             🇮🇳 India Only
           </span>
+          <Button
+            onClick={handleNewChat}
+            variant="outline"
+            size="sm"
+            className="ml-auto mr-4 flex items-center gap-2"
+            title="Start new chat"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span className="hidden sm:inline text-[10px]">New Chat</span>
+          </Button>
         </div>
         <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.2em] mt-1 opacity-60">
           Intelligent Research Assistant for Indian Policies
@@ -289,7 +349,10 @@ const SimulatePolicyPage = () => {
       {/* Input Overlay */}
       <div className="fixed bottom-0 left-0 right-0 z-[100] pointer-events-none">
         <div className="max-w-3xl mx-auto w-full px-2 md:px-3 pb-2 md:pb-3 pointer-events-auto bg-gradient-to-t from-background to-transparent pt-8">
-          <ChatInput onSendMessage={handleSendMessage} isLoading={loading} />
+          <ChatInput 
+            onSendMessage={handleSendMessage}
+            isLoading={loading} 
+          />
         </div>
       </div>
     </div>
