@@ -58,14 +58,17 @@ const SimulatePolicyPage = () => {
   const [apiResults, setApiResults] = useState<SimulationResult | null>(null);
   const { toast } = useToast();
 
-  // Load messages from localStorage on mount
+  // Load messages and results from localStorage on mount
   useEffect(() => {
     const savedMessages = localStorage.getItem("policySimulationChat");
+    const savedResults = localStorage.getItem("policySimulationResults");
+    const savedShowResults = localStorage.getItem("policySimulationShowResults");
+    const savedControversial = localStorage.getItem("policySimulationControversial");
+
     if (savedMessages) {
       try {
         setMessages(JSON.parse(savedMessages));
       } catch {
-        // If parsing fails, use default message
         setMessages([
           {
             id: "initial-ai",
@@ -83,6 +86,30 @@ const SimulatePolicyPage = () => {
         }
       ]);
     }
+
+    if (savedResults) {
+      try {
+        setApiResults(JSON.parse(savedResults));
+      } catch {
+        // fallback if parsing fails
+      }
+    }
+
+    if (savedShowResults) {
+      try {
+        setShowResults(JSON.parse(savedShowResults));
+      } catch {
+        // fallback
+      }
+    }
+
+    if (savedControversial) {
+      try {
+        setHasControversialPolicy(JSON.parse(savedControversial));
+      } catch {
+        // fallback
+      }
+    }
   }, []);
 
   // Save messages to localStorage whenever they change
@@ -90,8 +117,28 @@ const SimulatePolicyPage = () => {
     localStorage.setItem("policySimulationChat", JSON.stringify(messages));
   }, [messages]);
 
+  // Save results to localStorage whenever they change
+  useEffect(() => {
+    if (apiResults) {
+      localStorage.setItem("policySimulationResults", JSON.stringify(apiResults));
+    }
+  }, [apiResults]);
+
+  // Save showResults state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("policySimulationShowResults", JSON.stringify(showResults));
+  }, [showResults]);
+
+  // Save controversial policy flag to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("policySimulationControversial", JSON.stringify(hasControversialPolicy));
+  }, [hasControversialPolicy]);
+
   const handleNewChat = () => {
     localStorage.removeItem("policySimulationChat");
+    localStorage.removeItem("policySimulationResults");
+    localStorage.removeItem("policySimulationShowResults");
+    localStorage.removeItem("policySimulationControversial");
     setMessages([
       {
         id: "initial-ai",
