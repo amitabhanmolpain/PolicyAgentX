@@ -51,6 +51,7 @@ const SimulatePolicyPage = () => {
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [showIndiaWarning, setShowIndiaWarning] = useState(false);
+  const [hasControversialPolicy, setHasControversialPolicy] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
 
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -100,6 +101,21 @@ const SimulatePolicyPage = () => {
     ]);
     setShowResults(false);
     setApiResults(null);
+    setHasControversialPolicy(false);
+  };
+
+  const detectControversialPolicy = (text: string): boolean => {
+    const controversialKeywords = [
+      "removal", "expulsion", "ban", "discriminat", "religion", "communal", "riot", "violence",
+      "caste", "hindu", "muslim", "christian", "sikh", "buddha", "jew", "minority", "majority",
+      "ethnic", "racial", "persecution", "genocide", "massacre", "pogrom", "cleansing",
+      "sectarian", "religious hatred", "religious conflict", "communal violence", "riots",
+      "targeted killing", "targeted attack", "religious targeting", "faith-based discrimination",
+      "anti-semitism", "islamophobia", "hinduphobia", "christianophobia", "religious intolerance"
+    ];
+    
+    const lower = text.toLowerCase();
+    return controversialKeywords.some(keyword => lower.includes(keyword));
   };
 
   const handleSendMessage = async (content: string) => {
@@ -117,29 +133,31 @@ const SimulatePolicyPage = () => {
       content: "🔄 Analyzing policy with AI agents..."
     };
     setMessages(prev => [...prev, thinkingMsg]);
+// Check for controversial policy
+    const isControversial = detectControversialPolicy(content);
+    setHasControversialPolicy(isControversial);
 
-    // Check if policy is for India
-    const indiaKeywords = [
-      "india", "indian", "delhi", "mumbai", "bangalore", "karnataka", 
-      "maharashtra", "tamil nadu", "west bengal", "uttar pradesh",
-      "delhi ncr", "kolkata", "hyderabad", "pune", "rupee", "crore",
-      "lakh", "gst", "pib", "ministry", "parliament", "lok sabha",
-      "rajya sabha", "indian government", "indian economy", "indian rupee",
-      "reserve bank", "rbi", "nifty", "sensex", "india budget",
-      "indian policy", "central government", "state government"
+    // Check if policy is explicitly for NON-India countries (default to India)
+    const nonIndiaKeywords = [
+      "usa", "america", "us", "united states", "american",
+      "europe", "european", "uk", "united kingdom", "british",
+      "china", "chinese", "japan", "japanese", "south korea", "korean",
+      "africa", "african", "australia", "australian", "canada", "canadian",
+      "brazil", "mexican", "mexico", "russia", "middle east", "arab",
+      "singapore", "thailand", "vietnam", "malaysia"
     ];
     
     const lower = content.toLowerCase();
-    const isIndiaPolicy = indiaKeywords.some(keyword => lower.includes(keyword));
+    const isNonIndiaPolicy = nonIndiaKeywords.some(keyword => lower.includes(keyword));
 
-    if (!isIndiaPolicy) {
+    if (isNonIndiaPolicy) {
       setLoading(false);
       setShowIndiaWarning(true);
       
       const warningMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "⚠️ PolicyAgentX is specifically designed for Indian government policies only. Please provide an Indian policy for analysis (e.g., policies related to India, Indian states, or Indian economic indicators)."
+        content: "⚠️ PolicyAgentX is specifically designed for Indian policies only. The policy you mentioned appears to be for another country. Please provide an Indian policy for analysis."
       };
       setMessages(prev => [...prev, warningMsg]);
       
@@ -238,8 +256,75 @@ const SimulatePolicyPage = () => {
 
   const labelClass = "text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-semibold mb-3 block";
 
+  const analyzeImpactSentiment = (text: string): number => {
+    if (!text) return 0;
+    const positive = (text.match(/benefits|positive|increase|boost|improve|growth|strength/gi) || []).length;
+    const negative = (text.match(/decrease|loss|decline|harm|reduce|negative|worsen/gi) || []).length;
+    const neutral = (text.match(/unchanged|stable|maintain/gi) || []).length;
+    const total = positive + negative + neutral;
+    if (total === 0) return 50;
+    return Math.round((positive / total) * 100);
+  };
+
+  const getImpactChartData = () => {
+    if (!apiResults) return [];
+    return [
+      {
+        name: "Economic",
+        score: analyzeImpactSentiment(apiResults.economic_impact),
+        impact: "economic_impact"
+      },
+      {
+        name: "Social",
+        score: analyzeImpactSentiment(apiResults.social_impact),
+        impact: "social_impact"
+      },
+      {
+        name: "Business",
+        score: analyzeImpactSentiment(apiResults.business_impact),
+        impact: "business_impact"
+      },
+      {
+        name: "Government",
+        score: analyzeImpactSentiment(apiResults.government_impact),
+        impact: "government_impact"
+      },
+    ];
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score < 30) return "#ef4444"; // red
+    if (score < 50) return "#eab308"; // yellow
+    if (score < 70) return "#3b82f6"; // blue
+    return "#10b981"; // green
+  };
+
   return (
     <div className="flex flex-col min-h-[calc(100vh-64px)] w-full bg-background relative">
+      {/* Controversial Policy Alert */}
+      <AnimatePresence>
+        {hasControversialPolicy && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="w-full bg-red-950/80 border-b-2 border-red-500 py-4 px-4 backdrop-blur-sm"
+          >
+            <div className="max-w-4xl mx-auto flex items-center gap-4">
+              <motion.div
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 0.8, repeat: Infinity }}
+                className="w-4 h-4 rounded-full bg-red-600 shadow-lg shadow-red-600/50 flex-shrink-0"
+              />
+              <div className="flex-1">
+                <p className="text-red-400 font-bold text-sm uppercase tracking-wide">⚠️ HIGH RISK ALERT</p>
+                <p className="text-red-300 text-xs mt-1">This policy contains contentious content that could potentially lead to social unrest, communal tensions, or rioting. Please review with extreme caution and consult domain experts.</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Dynamic Header */}
       <div className="flex-none pt-8 pb-4 text-center bg-background/50 backdrop-blur-md z-40">
         <div className="flex items-center justify-center gap-3 mb-2">
@@ -296,10 +381,28 @@ const SimulatePolicyPage = () => {
                     <GlowCard
                       key={r.label}
                       delay={i * 0.05}
-                      className="p-10 bg-secondary/20 border border-border/50 backdrop-blur-sm min-h-[340px] flex flex-col justify-start"
+                      className="p-10 bg-secondary/20 border border-border/50 backdrop-blur-sm min-h-[420px] flex flex-col justify-start"
                     >
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-[0.15em] mb-6 font-bold opacity-80">{r.label}</p>
-                      <div className="space-y-3">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-[0.15em] mb-4 font-bold opacity-80">{r.label}</p>
+                      
+                      {/* Impact Score Visualization */}
+                      <div className="mb-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[9px] text-muted-foreground uppercase">Impact Score</span>
+                          <span className="text-sm font-bold text-emerald-400">{analyzeImpactSentiment(r.value)}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-secondary/50 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${analyzeImpactSentiment(r.value)}%` }}
+                            transition={{ duration: 1, ease: "easeOut" }}
+                            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Impact Details */}
+                      <div className="flex-1 space-y-3 mb-4">
                         {r.value.split('\n').map((line, idx) => {
                           const cleanLine = line.trim();
                           if (!cleanLine) return null;
@@ -311,9 +414,47 @@ const SimulatePolicyPage = () => {
                           );
                         })}
                       </div>
+
+                      {/* Sentiment Indicator */}
+                      <div className="flex gap-2 pt-4 border-t border-border/30">
+                        {[
+                          { label: "Positive", color: "#10b981", value: (r.value.match(/benefits|positive|increase|boost|improve|growth/gi) || []).length },
+                          { label: "Negative", color: "#ef4444", value: (r.value.match(/decrease|loss|decline|harm|reduce|negative/gi) || []).length },
+                          { label: "Neutral", color: "#6b7280", value: (r.value.match(/unchanged|stable|maintain/gi) || []).length },
+                        ].map((sentiment) => (
+                          <div key={sentiment.label} className="flex-1 text-center">
+                            <div className="text-[8px] text-muted-foreground mb-1 uppercase">{sentiment.label}</div>
+                            <div className="text-lg font-bold" style={{ color: sentiment.color }}>{sentiment.value}</div>
+                          </div>
+                        ))}
+                      </div>
                     </GlowCard>
                   ))}
                 </div>
+
+                {/* Overall Impact Chart */}
+                <GlowCard hoverable={false} className="p-10 bg-secondary/10 border-border/20 mt-12">
+                  <p className={labelClass + " mb-0"}>Overall Impact Analysis</p>
+                  <div className="mt-6">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={getImpactChartData()}>
+                        <CartesianGrid strokeDasharray="8 8" stroke="#1F1F23" vertical={false} />
+                        <XAxis dataKey="name" stroke="#71717A" fontSize={11} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#71717A" fontSize={11} tickLine={false} axisLine={false} domain={[0, 100]} />
+                        <Tooltip 
+                          contentStyle={{ background: "#0B0B0C", border: "1px solid #1F1F23", borderRadius: "12px", fontSize: 11 }}
+                          formatter={(value) => [`${value}% Positive`, "Score"]}
+                        />
+                        <Bar 
+                          dataKey="score" 
+                          fill="#10b981" 
+                          radius={[8, 8, 0, 0]}
+                          animationDuration={1000}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </GlowCard>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 px-2 md:px-0 pb-16">
                   <GlowCard hoverable={false} className="p-8 bg-secondary/10 border-border/20">

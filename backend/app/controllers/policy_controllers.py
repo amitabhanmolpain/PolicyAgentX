@@ -21,12 +21,27 @@ def make_json_serializable(obj):
         return obj
 
 
+def is_non_india_policy(text: str) -> bool:
+    """Check if policy is explicitly for non-India countries"""
+    non_india_keywords = [
+        "usa", "america", "us", "united states", "american",
+        "europe", "european", "uk", "united kingdom", "british",
+        "china", "chinese", "japan", "japanese", "south korea", "korean",
+        "africa", "african", "australia", "australian", "canada", "canadian",
+        "brazil", "mexican", "mexico", "russia", "middle east", "arab",
+        "singapore", "thailand", "vietnam", "malaysia"
+    ]
+    
+    text_lower = text.lower()
+    return any(keyword in text_lower for keyword in non_india_keywords)
+
+
 def is_india_policy(text: str) -> bool:
     """Check if policy is related to India"""
     india_keywords = [
         "india", "indian", "delhi", "mumbai", "bangalore", "karnataka", 
         "maharashtra", "tamil nadu", "west bengal", "uttar pradesh",
-        "delhi ncr", "kolkata", "hyderabad", "pune", "delhi", "rupee",
+        "delhi ncr", "kolkata", "hyderabad", "pune", "rupee",
         "rupees", "crore", "lakh", "gst", "pib", "ministry", "parliament",
         "lok sabha", "rajya sabha", "indian government", "indian economy",
         "indian rupee", "reserve bank", "rbi", "nifty", "sensex"
@@ -35,8 +50,12 @@ def is_india_policy(text: str) -> bool:
     text_lower = text.lower()
     india_mentions = sum(1 for keyword in india_keywords if keyword in text_lower)
     
-    # If 0 India keywords found, it's likely not India policy
-    return india_mentions > 0
+    # If explicitly non-India, return False
+    if is_non_india_policy(text):
+        return False
+    
+    # Default to True (assume India policy unless explicitly non-India)
+    return True
 
 
 # ==============================
@@ -47,16 +66,16 @@ def handle_simulation(data):
         return {"error": "Policy text is required"}, 400
 
     try:
-        # create policy input
+        # create policy input - default region to India
         policy = PolicyInput(
             text=data["text"],
             region=data.get("region", "India")
         )
 
-        # Validate India policy
-        if not is_india_policy(policy.text):
+        # Check if policy is explicitly for non-India countries
+        if is_non_india_policy(policy.text):
             return {
-                "error": "PolicyAgentX is specifically designed for Indian government policies only. Please provide an Indian policy for analysis."
+                "error": "PolicyAgentX is specifically designed for Indian government policies only."
             }, 400
 
         # Initialize state for graph
