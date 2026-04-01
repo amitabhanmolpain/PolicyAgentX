@@ -5,6 +5,15 @@ from bson import ObjectId
 import traceback
 import json
 from datetime import datetime
+import os
+
+# RAG Pipeline (optional, will load if available)
+RAG_AVAILABLE = False
+try:
+    from rag.policy_rag_retriever import analyze_policy_with_rag, PolicyRAGRetriever
+    RAG_AVAILABLE = True
+except ImportError:
+    pass
 
 
 def make_json_serializable(obj):
@@ -125,6 +134,104 @@ def handle_simulation(data):
 
 
 # ==============================
+# 🤖 RAG-ENHANCED SIMULATION (with financial forecasting)
+# ==============================
+def handle_simulation_with_rag(data):
+    """Enhanced simulation using RAG pipeline with:
+    - Financial impact prediction
+    - Demographic segmentation
+    - Future projections
+    - Historical policy comparison
+    """
+    if not data or "text" not in data:
+        return {"error": "Policy text is required"}, 400
+    
+    if not RAG_AVAILABLE:
+        return {"error": "RAG pipeline not initialized. Using standard simulation."}, 400
+    
+    try:
+        policy_text = data.get("text", "")
+        is_advanced = data.get("advanced_analysis", False)
+        
+        # Check if India policy
+        if is_non_india_policy(policy_text):
+            return {
+                "error": "PolicyAgentX is specifically designed for Indian government policies only."
+            }, 400
+        
+        print(f"\n🔄 RAG-Enhanced Analysis: {'Advanced' if is_advanced else 'Standard'}")
+        
+        # Run RAG-enhanced analysis
+        rag_result = analyze_policy_with_rag(policy_text)
+        analysis = rag_result["analysis"]
+        
+        # Format for API response
+        result = {
+            "policy_text": policy_text,
+            "analysis_type": "rag_enhanced",
+            "timestamp": datetime.now().isoformat(),
+            
+            # Financial Analysis
+            "financial": {
+                "net_impact_crores": analysis.financial_impact.net_impact,
+                "estimated_revenue_crores": analysis.financial_impact.estimated_revenue_crores,
+                "implementation_cost_crores": analysis.financial_impact.implementation_cost,
+                "per_capita_impact": f"₹{analysis.financial_impact.revenue_per_capita:,.0f}",
+                "confidence": f"{analysis.financial_impact.confidence_level}%",
+            },
+            
+            # Demographic Impact
+            "demographic_impact": [
+                {
+                    "income_class": demo.income_class,
+                    "population_affected": demo.population_affected,
+                    "beneficiaries_percent": f"{demo.beneficiaries_percent:.1f}%",
+                    "sufferers_percent": f"{demo.sufferers_percent:.1f}%",
+                    "net_benefit_per_person": f"₹{demo.net_benefit_per_person:,.0f}",
+                    "impact": "🟢 BENEFIT" if demo.beneficiaries_percent > demo.sufferers_percent else "🔴 SUFFER"
+                }
+                for demo in analysis.demographic_impacts
+            ],
+            
+            # Future Outlook
+            "future_projections": [
+                {
+                    "year": proj.year,
+                    "gdp_impact": f"{proj.gdp_impact_percent:+.2f}%",
+                    "employment_change": f"{proj.employment_jobs_gained:+,} jobs",
+                    "inflation_impact": f"{proj.inflation_impact:+.2f}%",
+                    "tax_revenue_impact": f"₹{proj.tax_revenue_impact_crores:+,.0f}Cr"
+                }
+                for proj in analysis.future_projections
+            ],
+            
+            # Summary
+            "main_beneficiaries": analysis.main_beneficiaries,
+            "main_sufferers": analysis.main_sufferers,
+            "risk_factors": analysis.risk_factors,
+            "recommendations": analysis.recommendations,
+            
+            # Full formatted report
+            "formatted_report": rag_result["report"]
+        }
+        
+        # Make JSON-serializable
+        result = make_json_serializable(result)
+        
+        # Save to database
+        try:
+            policy_collection.insert_one(result.copy())
+        except Exception as db_err:
+            print(f"Database save error: {str(db_err)}")
+        
+        return result, 200
+        
+    except Exception as e:
+        print(f"Error in RAG analysis: {traceback.format_exc()}")
+        return {"error": f"RAG analysis failed: {str(e)}"}, 500
+
+
+# ==============================
 # 📄 PDF HANDLER
 # ==============================
 def handle_pdf_upload(file):
@@ -160,3 +267,89 @@ def handle_history():
 # ==============================
 def handle_health():
     return {"status": "Backend running 🚀"}, 200
+
+
+# ==============================
+# 🤖 ORCHESTRATED ANALYSIS (RAG + All Agents)
+# ==============================
+def handle_orchestrated_analysis(data):
+    """Comprehensive policy analysis using RAG + AI agents orchestration:
+    - Financial Agent: Revenue/cost impact
+    - Demographic Agent: Income class effects
+    - Social Agent: Welfare & inclusion analysis
+    - Economic Agent: GDP & employment predictions
+    - Business Agent: Industry competitiveness
+    - Risk Agent: Risk factors & mitigation
+    - Government Agent: Stakeholder coordination
+    """
+    if not data or "text" not in data:
+        return {"error": "Policy text is required"}, 400
+    
+    try:
+        policy_text = data.get("text", "")
+        
+        # Check if India policy
+        if is_non_india_policy(policy_text):
+            return {
+                "error": "PolicyAgentX is specifically designed for Indian government policies only."
+            }, 400
+        
+        print(f"\n🔄 Orchestrating Multi-Agent Policy Analysis...")
+        
+        # Import orchestrator
+        from agents.rag_agent_orchestrator import RAGAgentOrchestrator
+        
+        # Create orchestrator instance
+        orchestrator = RAGAgentOrchestrator()
+        
+        # Run comprehensive analysis
+        analysis_result = orchestrator.orchestrate_policy_analysis(policy_text)
+        
+        # Format response
+        result = {
+            "policy_text": policy_text,
+            "analysis_type": "orchestrated_agents",
+            "timestamp": datetime.now().isoformat(),
+            
+            # Policy Summary
+            "policy_summary": analysis_result.get("policy_summary", {}),
+            
+            # Financial Analysis
+            "financial_impact": analysis_result.get("financial_impact", {}),
+            
+            # Demographic Analysis
+            "demographic_impact": analysis_result.get("demographic_impact", {}),
+            
+            # Social Impact
+            "social_impact": analysis_result.get("social_impact", {}),
+            
+            # Economic Outlook
+            "economic_outlook": analysis_result.get("economic_outlook", {}),
+            
+            # Business Implications
+            "business_implications": analysis_result.get("business_implications", {}),
+            
+            # Risk Assessment
+            "risk_assessment": analysis_result.get("risk_assessment", {}),
+            
+            # Government Coordination
+            "government_coordination": analysis_result.get("government_coordination", {}),
+            
+            # Executive Summary
+            "executive_summary": analysis_result.get("execution_summary", "")
+        }
+        
+        # Make JSON-serializable
+        result = make_json_serializable(result)
+        
+        # Save to database
+        try:
+            policy_collection.insert_one(result.copy())
+        except Exception as db_err:
+            print(f"Database save error: {str(db_err)}")
+        
+        return result, 200
+        
+    except Exception as e:
+        print(f"Error in orchestrated analysis: {traceback.format_exc()}")
+        return {"error": f"Orchestrated analysis failed: {str(e)}"}, 500

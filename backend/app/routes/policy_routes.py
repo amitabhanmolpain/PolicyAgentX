@@ -1,9 +1,11 @@
 from flask import Blueprint, request, jsonify
 from app.controllers.policy_controllers import (
     handle_simulation,
+    handle_simulation_with_rag,
     handle_pdf_upload,
     handle_history,
-    handle_health
+    handle_health,
+    handle_orchestrated_analysis
 )
 
 policy_bp = Blueprint("policy", __name__)
@@ -12,6 +14,33 @@ policy_bp = Blueprint("policy", __name__)
 @policy_bp.route("/simulate", methods=["POST"])
 def simulate():
     result, status = handle_simulation(request.json)
+    return jsonify(result), status
+
+
+@policy_bp.route("/simulate-advanced", methods=["POST"])
+def simulate_advanced():
+    """RAG-enhanced simulation with:
+    - Financial forecasting
+    - Demographic segmentation
+    - Future projections
+    - Historical comparison
+    """
+    result, status = handle_simulation_with_rag(request.json)
+    return jsonify(result), status
+
+
+@policy_bp.route("/analyze-with-agents", methods=["POST"])
+def analyze_with_agents():
+    """Orchestrated analysis using RAG + all AI agents:
+    - Financial Agent: Revenue/cost analysis
+    - Demographic Agent: Income class impact
+    - Social Agent: Welfare & inclusion
+    - Economic Agent: GDP & employment predictions
+    - Business Agent: Industry impact
+    - Risk Agent: Risk assessment
+    - Government Agent: Stakeholder coordination
+    """
+    result, status = handle_orchestrated_analysis(request.json)
     return jsonify(result), status
 
 
