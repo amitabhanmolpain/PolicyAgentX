@@ -12,7 +12,7 @@ import {
 } from "recharts";
 
 const policyTypes = ["Tax Reform", "Subsidy Program", "Trade Policy", "Monetary Policy", "Environmental Regulation"];
-const regions = ["North America", "Europe", "Asia Pacific", "Middle East", "Africa", "South America"];
+const regions = ["India"];
 
 const trendData = [
   { month: "Jan", inflation: 2.1, gdp: 3.2, employment: 95.1 },
@@ -46,7 +46,7 @@ interface Message {
 const SimulatePolicyPage = () => {
   const [policyType, setPolicyType] = useState(policyTypes[0]);
   const [value, setValue] = useState(50);
-  const [region, setRegion] = useState(regions[0]);
+  const [region, setRegion] = useState("India");
   const [duration, setDuration] = useState(12);
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);

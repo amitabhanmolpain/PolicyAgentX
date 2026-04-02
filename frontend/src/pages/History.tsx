@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import GlowCard from "@/components/GlowCard";
-import { Clock, MapPin, TrendingUp, X } from "lucide-react";
-import { getHistory, SimulationResult } from "@/lib/api";
+import { Clock, MapPin, TrendingUp, X, Trash2 } from "lucide-react";
+import { getHistory, deletePolicy, SimulationResult } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface HistoryItem {
+  _id?: string;
   id?: number;
   text?: string;
   policy_text?: string;
@@ -26,14 +27,41 @@ const HistoryPage = () => {
   const [historyData, setHistoryData] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<HistoryItem | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchHistory = async () => {
+  const handleDeletePolicy = async (policyId: string) => {
+    setDeleting(true);
+    try {
+      await deletePolicy(policyId);
+      setHistoryData(historyData.filter((item) => item._id !== policyId));
+      setDeleteConfirm(null);
+      if (selected?._id === policyId) {
+        setSelected(null);
+      }
+      toast({
+        title: "Success",
+        description: "Policy deleted successfully",
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete policy";
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: errorMessage,
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const fetchHistory = async () => {
       try {
         const data = await getHistory();
-        // Sort by timestamp (newest first)
-        const sortedData = data.sort((a, b) => {
+        // Filter to only show India policies and sort by timestamp (newest first)
+        const filteredData = data.filter(item => item.region === "India" || !item.region);
+        const sortedData = filteredData.sort((a, b) => {
           const dateA = new Date(a.timestamp || 0).getTime();
           const dateB = new Date(b.timestamp || 0).getTime();
           return dateB - dateA;
@@ -53,6 +81,7 @@ const HistoryPage = () => {
       }
     };
 
+  useEffect(() => {
     fetchHistory();
   }, [toast]);
 
@@ -81,10 +110,10 @@ const HistoryPage = () => {
             <GlowCard
               key={i}
               delay={i * 0.08}
-              className="cursor-pointer group p-8"
+              className="cursor-pointer group p-8 relative"
             >
-              <div onClick={() => setSelected(item)} className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                <div className="flex-1">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                <div className="flex-1" onClick={() => setSelected(item)}>
                   <div className="inline-flex items-center px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-[10px] font-bold text-accent uppercase tracking-widest mb-3">
                     Policy Simulation
                   </div>
@@ -94,11 +123,21 @@ const HistoryPage = () => {
                     {item.timestamp && <span className="flex items-center gap-2"><Clock className="w-4 h-4 opacity-50" />{new Date(item.timestamp).toLocaleDateString()} {new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>}
                   </div>
                 </div>
-                <div className="flex items-center gap-8">
-                  <div className="text-right">
+                <div className="flex items-center gap-4">
+                  <div onClick={() => setSelected(item)} className="text-right cursor-pointer">
                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1 font-semibold">Status</p>
                      <p className="text-lg font-display font-bold text-emerald-400 tracking-tighter">✓ Analyzed</p>
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteConfirm(item._id || "");
+                    }}
+                    className="p-2 rounded-lg hover:bg-destructive/20 text-destructive hover:text-destructive transition-colors"
+                    title="Delete policy"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
             </GlowCard>
@@ -130,9 +169,21 @@ const HistoryPage = () => {
                   <h2 className="font-display font-bold text-2xl text-white tracking-tight">Policy Simulation</h2>
                   <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-muted-foreground mt-2">{selected.region || "N/A"} · {selected.date || "N/A"}</p>
                 </div>
-                <button onClick={() => setSelected(null)} className="text-muted-foreground hover:text-white transition-all transform hover:rotate-90 duration-300">
-                  <X className="w-6 h-6" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteConfirm(selected._id || "");
+                    }}
+                    className="p-2 rounded-lg hover:bg-destructive/20 text-destructive hover:text-destructive transition-colors"
+                    title="Delete policy"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                  <button onClick={() => setSelected(null)} className="text-muted-foreground hover:text-white transition-all transform hover:rotate-90 duration-300 p-2">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -166,6 +217,47 @@ const HistoryPage = () => {
                   <p className="text-sm text-muted-foreground leading-relaxed">{selected.recommendation}</p>
                 </div>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Dialog */}
+      <AnimatePresence>
+        {deleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[101] flex items-center justify-center bg-black/80 backdrop-blur-xl p-6"
+            onClick={() => setDeleteConfirm(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#151517] border border-destructive/20 rounded-2xl p-8 max-w-sm w-full shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+            >
+              <h3 className="font-display font-bold text-xl text-white mb-2">Delete Policy</h3>
+              <p className="text-sm text-muted-foreground mb-6">Are you sure you want to delete this policy? This action cannot be undone.</p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 px-4 py-2 rounded-lg border border-[#1F1F23] text-white hover:bg-[#1F1F23] transition-colors"
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeletePolicy(deleteConfirm)}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 rounded-lg bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors disabled:opacity-50"
+                >
+                  {deleting ? "Deleting..." : "Delete"}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

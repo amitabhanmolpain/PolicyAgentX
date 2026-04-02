@@ -5,7 +5,8 @@ from app.controllers.policy_controllers import (
     handle_pdf_upload,
     handle_history,
     handle_health,
-    handle_orchestrated_analysis
+    handle_orchestrated_analysis,
+    handle_delete_policy
 )
 
 policy_bp = Blueprint("policy", __name__)
@@ -54,6 +55,12 @@ def upload():
 @policy_bp.route("/history", methods=["GET"])
 def history():
     result, status = handle_history()
+    return jsonify(result), status
+
+
+@policy_bp.route("/history/<policy_id>", methods=["DELETE"])
+def delete_policy(policy_id):
+    result, status = handle_delete_policy(policy_id)
     return jsonify(result), status
 
 

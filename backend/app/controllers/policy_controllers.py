@@ -75,16 +75,16 @@ def handle_simulation(data):
         return {"error": "Policy text is required"}, 400
 
     try:
-        # create policy input - default region to India
+        # create policy input - force region to India
         policy = PolicyInput(
             text=data["text"],
-            region=data.get("region", "India")
+            region="India"
         )
 
         # Check if policy is explicitly for non-India countries
         if is_non_india_policy(policy.text):
             return {
-                "error": "PolicyAgentX is specifically designed for Indian government policies only."
+                "error": "PolicyAgentX is specifically designed for Indian government policies only. Please enter an India-specific policy."
             }, 400
 
         # Initialize state for graph
@@ -250,8 +250,8 @@ def handle_pdf_upload(file):
 # ==============================
 def handle_history():
     try:
-        # Query without _id field (already excluded in find)
-        data = list(policy_collection.find({}, {"_id": 0}))
+        # Query with _id field for deletion capability
+        data = list(policy_collection.find({}))
         
         # Ensure all data is JSON-serializable
         data = [make_json_serializable(item) for item in data]
@@ -259,6 +259,23 @@ def handle_history():
         return data, 200
     except Exception as e:
         print(f"Error in handle_history: {traceback.format_exc()}")
+        return {"error": str(e)}, 500
+
+
+def handle_delete_policy(policy_id):
+    """Delete a policy from history by ID"""
+    try:
+        if not policy_id:
+            return {"error": "Policy ID is required"}, 400
+        
+        result = policy_collection.delete_one({"_id": ObjectId(policy_id)})
+        
+        if result.deleted_count == 0:
+            return {"error": "Policy not found"}, 404
+        
+        return {"message": "Policy deleted successfully", "id": policy_id}, 200
+    except Exception as e:
+        print(f"Error in handle_delete_policy: {traceback.format_exc()}")
         return {"error": str(e)}, 500
 
 
