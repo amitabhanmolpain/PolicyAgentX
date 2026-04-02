@@ -30,6 +30,28 @@ const comparisonData = [
   { name: "Sentiment", value: 0.8 },
 ];
 
+const simpleStem = (word: string): string => {
+  let token = (word || "").toLowerCase().replace(/[^a-z]/g, "");
+  const suffixes = ["ingly", "edly", "ment", "tion", "sion", "ance", "ence", "ing", "ed", "ly", "es", "s"];
+  for (const suffix of suffixes) {
+    if (token.endsWith(suffix) && token.length > suffix.length + 2) {
+      token = token.slice(0, -suffix.length);
+      break;
+    }
+  }
+  return token;
+};
+
+const tokenizeAndStem = (text: string): string[] => {
+  return (text.match(/[a-zA-Z]+/g) || []).map(simpleStem).filter(Boolean);
+};
+
+const countStemMatches = (text: string, keywords: string[]): number => {
+  const stems = tokenizeAndStem(text || "");
+  const keywordStems = new Set(keywords.map(simpleStem));
+  return stems.reduce((acc, stem) => acc + (keywordStems.has(stem) ? 1 : 0), 0);
+};
+
 interface ResultItem {
   label: string;
   value: string;
@@ -139,6 +161,9 @@ const SimulatePolicyPage = () => {
     localStorage.removeItem("policySimulationResults");
     localStorage.removeItem("policySimulationShowResults");
     localStorage.removeItem("policySimulationControversial");
+    localStorage.removeItem("policyCompareData");
+    localStorage.removeItem("policyCompareSourceText");
+    localStorage.setItem("policyCompareNeedsRefresh", "true");
     setMessages([
       {
         id: "initial-ai",
@@ -254,6 +279,9 @@ const SimulatePolicyPage = () => {
       }
 
       setApiResults(result);
+      if (result?.policy_text) {
+        localStorage.setItem("policyLatestPolicyText", result.policy_text);
+      }
       setLoading(false);
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
@@ -305,9 +333,9 @@ const SimulatePolicyPage = () => {
 
   const analyzeImpactSentiment = (text: string): number => {
     if (!text) return 0;
-    const positive = (text.match(/benefits|positive|increase|boost|improve|growth|strength/gi) || []).length;
-    const negative = (text.match(/decrease|loss|decline|harm|reduce|negative|worsen/gi) || []).length;
-    const neutral = (text.match(/unchanged|stable|maintain/gi) || []).length;
+    const positive = countStemMatches(text, ["benefits", "positive", "increase", "boost", "improve", "growth", "strength"]);
+    const negative = countStemMatches(text, ["decrease", "loss", "decline", "harm", "reduce", "negative", "worsen"]);
+    const neutral = countStemMatches(text, ["unchanged", "stable", "maintain"]);
     const total = positive + negative + neutral;
     if (total === 0) return 50;
     return Math.round((positive / total) * 100);
@@ -465,9 +493,9 @@ const SimulatePolicyPage = () => {
                       {/* Sentiment Indicator */}
                       <div className="flex gap-2 pt-4 border-t border-border/30">
                         {[
-                          { label: "Positive", color: "#10b981", value: (r.value.match(/benefits|positive|increase|boost|improve|growth/gi) || []).length },
-                          { label: "Negative", color: "#ef4444", value: (r.value.match(/decrease|loss|decline|harm|reduce|negative/gi) || []).length },
-                          { label: "Neutral", color: "#6b7280", value: (r.value.match(/unchanged|stable|maintain/gi) || []).length },
+                          { label: "Positive", color: "#10b981", value: countStemMatches(r.value, ["benefits", "positive", "increase", "boost", "improve", "growth"]) },
+                          { label: "Negative", color: "#ef4444", value: countStemMatches(r.value, ["decrease", "loss", "decline", "harm", "reduce", "negative"]) },
+                          { label: "Neutral", color: "#6b7280", value: countStemMatches(r.value, ["unchanged", "stable", "maintain"]) },
                         ].map((sentiment) => (
                           <div key={sentiment.label} className="flex-1 text-center">
                             <div className="text-[8px] text-muted-foreground mb-1 uppercase">{sentiment.label}</div>

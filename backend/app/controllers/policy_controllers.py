@@ -4,6 +4,7 @@ from app.models.db_model import policy_collection
 from bson import ObjectId
 import traceback
 import json
+import re
 from datetime import datetime
 import os
 
@@ -65,6 +66,20 @@ def is_india_policy(text: str) -> bool:
     
     # Default to True (assume India policy unless explicitly non-India)
     return True
+
+
+def _simple_stem(word: str) -> str:
+    """A lightweight stemmer for consistent keyword matching."""
+    token = re.sub(r"[^a-z]", "", word.lower())
+    for suffix in ("ingly", "edly", "ment", "tion", "sion", "ance", "ence", "ingly", "edly", "ing", "ed", "ly", "es", "s"):
+        if token.endswith(suffix) and len(token) > len(suffix) + 2:
+            token = token[:-len(suffix)]
+            break
+    return token
+
+
+def _stem_tokens(text: str):
+    return [_simple_stem(token) for token in re.findall(r"[a-zA-Z]+", text or "")]
 
 
 # ==============================
@@ -470,10 +485,16 @@ Provide ONLY the improved policy text, nothing else. Make it specific to India's
             def sentiment_score(text):
                 positive_words = ['benefits', 'positive', 'increase', 'boost', 'improve', 'growth', 'strength', 'advantage', 'better', 'efficient']
                 negative_words = ['decrease', 'loss', 'decline', 'harm', 'reduce', 'negative', 'challenge', 'risk', 'burden']
-                
-                text_lower = text.lower()
-                positive = sum(1 for w in positive_words if w in text_lower)
-                negative = sum(1 for w in negative_words if w in text_lower)
+
+                stems = _stem_tokens(text)
+                if not stems:
+                    return 50
+
+                positive_stems = {_simple_stem(word) for word in positive_words}
+                negative_stems = {_simple_stem(word) for word in negative_words}
+
+                positive = sum(1 for stem in stems if stem in positive_stems)
+                negative = sum(1 for stem in stems if stem in negative_stems)
                 total = positive + negative
                 
                 if total == 0:

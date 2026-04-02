@@ -39,6 +39,28 @@ const sanitizeText = (text: string) => {
     .trim();
 };
 
+const simpleStem = (word: string): string => {
+  let token = (word || "").toLowerCase().replace(/[^a-z]/g, "");
+  const suffixes = ["ingly", "edly", "ment", "tion", "sion", "ance", "ence", "ing", "ed", "ly", "es", "s"];
+  for (const suffix of suffixes) {
+    if (token.endsWith(suffix) && token.length > suffix.length + 2) {
+      token = token.slice(0, -suffix.length);
+      break;
+    }
+  }
+  return token;
+};
+
+const tokenizeAndStem = (text: string): string[] => {
+  return ((text || "").match(/[a-zA-Z]+/g) || []).map(simpleStem).filter(Boolean);
+};
+
+const countStemMatches = (text: string, keywords: string[]): number => {
+  const stems = tokenizeAndStem(text);
+  const keywordStems = new Set(keywords.map(simpleStem));
+  return stems.reduce((acc, stem) => acc + (keywordStems.has(stem) ? 1 : 0), 0);
+};
+
 const toPolicyPoints = (text: string): string[] => {
   const lines = sanitizeText(text)
     .split("\n")
@@ -109,7 +131,7 @@ const getOriginalCons = (metrics: PolicyMetrics): string[] => {
     .split(/(?<=[.!?])\s+/)
     .map((line) => line.trim())
     .filter((line) => line.length > 25)
-    .filter((line) => negativeKeywords.some((word) => line.toLowerCase().includes(word)));
+    .filter((line) => countStemMatches(line, negativeKeywords) > 0);
 
   const unique = Array.from(new Set(extracted)).slice(0, 5);
   if (unique.length > 0) {
@@ -164,6 +186,21 @@ const ComparePage = () => {
     const fetchAndCompare = async () => {
       try {
         setLoading(true);
+
+        const cachedData = localStorage.getItem("policyCompareData");
+        const cachedSourceText = localStorage.getItem("policyCompareSourceText") || "";
+        const needsRefresh = localStorage.getItem("policyCompareNeedsRefresh") === "true";
+        const latestPolicyText = localStorage.getItem("policyLatestPolicyText") || "";
+
+        if (cachedData && !needsRefresh && cachedSourceText && cachedSourceText === latestPolicyText) {
+          const parsed = JSON.parse(cachedData) as ComparisonData;
+          setData(parsed);
+          if ((parsed as any).gemini_error) {
+            setGeminiError((parsed as any).gemini_error);
+          }
+          setLoading(false);
+          return;
+        }
         
         // Fetch last policy from history with timeout
         const historyPromise = getHistory();
@@ -238,6 +275,11 @@ const ComparePage = () => {
         
         const comparisonData = await Promise.race([improvePromise, improveTimeoutPromise]);
         setData(comparisonData);
+
+        localStorage.setItem("policyCompareData", JSON.stringify(comparisonData));
+        localStorage.setItem("policyCompareSourceText", policyText);
+        localStorage.setItem("policyLatestPolicyText", policyText);
+        localStorage.setItem("policyCompareNeedsRefresh", "false");
         
         // Check if there was a Gemini error
         if (comparisonData.gemini_error) {
