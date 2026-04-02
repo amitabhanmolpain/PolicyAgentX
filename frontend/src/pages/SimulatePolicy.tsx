@@ -52,6 +52,10 @@ const countStemMatches = (text: string, keywords: string[]): number => {
   return stems.reduce((acc, stem) => acc + (keywordStems.has(stem) ? 1 : 0), 0);
 };
 
+const normalizeDisplayText = (text: string): string => {
+  return (text || "").replace(/_/g, " ").replace(/\s+/g, " ").trim();
+};
+
 interface ResultItem {
   label: string;
   value: string;
@@ -484,7 +488,7 @@ const SimulatePolicyPage = () => {
                           return (
                             <div key={idx} className="flex gap-3">
                               <span className="text-emerald-400 font-bold text-sm flex-shrink-0">•</span>
-                              <p className="text-xs text-emerald-300 leading-relaxed break-words">{cleanLine}</p>
+                              <p className="text-xs text-emerald-300 leading-relaxed break-words">{normalizeDisplayText(cleanLine)}</p>
                             </div>
                           );
                         })}

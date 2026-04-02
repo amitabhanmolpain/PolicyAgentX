@@ -35,6 +35,9 @@ env/
 .env
 .env.local
 
+# Sensitive credentials
+service-account.json
+
 # OS
 .DS_Store
 Thumbs.db

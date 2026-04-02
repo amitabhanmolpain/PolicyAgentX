@@ -12,16 +12,17 @@ const Layout = ({ children }: { children: ReactNode }) => {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       <AnimatePresence mode="wait">
-        <motion.main
-          key={location.pathname}
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -15 }}
-          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="flex-1 pt-28"
-        >
-          {children}
-        </motion.main>
+        <div key={location.pathname}>
+          <motion.main
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="flex-1 pt-28"
+          >
+            {children}
+          </motion.main>
+        </div>
       </AnimatePresence>
       {!hideFooter && <Footer />}
     </div>

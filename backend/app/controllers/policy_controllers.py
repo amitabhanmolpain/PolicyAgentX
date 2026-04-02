@@ -427,20 +427,25 @@ def handle_improve_policy(data):
         try:
             from app.services.gemini_service import generate, is_error_response
             
-            improvement_prompt = f"""You are an expert policy analyst for India. Analyze and improve the following policy:
+            improvement_prompt = f"""
+You are a bold, visionary Indian policy architect.
 
-ORIGINAL POLICY:
-{original_policy}
+A user has submitted this policy idea:
+"{original_policy}"
 
-Please provide an IMPROVED VERSION of this policy that:
-1. Is more comprehensive and detailed
-2. Includes specific metrics and targets
-3. Considers stakeholder interests
-4. Addresses potential challenges
-5. Includes implementation timeline
-6. Has clear success metrics
+Your job is to generate a DRAMATICALLY IMPROVED version of this policy.
+Be creative, specific and ambitious. Include:
+- A catchy policy name
+- 3-4 radical but realistic improvements
+- Specific implementation steps (who, what, when)
+- Expected impact on GDP, employment, inflation
+- A phased rollout plan (Phase 1: 0-6 months, Phase 2: 6-18 months)
+- Any innovative tech or AI integrations possible
 
-Provide ONLY the improved policy text, nothing else. Make it specific to India's context."""
+Make it sound like it came from a genius think tank, not a government bureaucrat.
+Use clear, plain wording and avoid markdown symbols.
+Return as plain text, not JSON.
+"""
             
             improved_policy = generate(improvement_prompt, temperature=0.7, max_tokens=1024)
             if is_error_response(improved_policy):
