@@ -6,7 +6,8 @@ from app.controllers.policy_controllers import (
     handle_history,
     handle_health,
     handle_orchestrated_analysis,
-    handle_delete_policy
+    handle_delete_policy,
+    handle_improve_policy
 )
 
 policy_bp = Blueprint("policy", __name__)
@@ -61,6 +62,13 @@ def history():
 @policy_bp.route("/history/<policy_id>", methods=["DELETE"])
 def delete_policy(policy_id):
     result, status = handle_delete_policy(policy_id)
+    return jsonify(result), status
+
+
+@policy_bp.route("/improve", methods=["POST"])
+def improve():
+    """Generate an improved version of a policy and compare impacts"""
+    result, status = handle_improve_policy(request.json)
     return jsonify(result), status
 
 

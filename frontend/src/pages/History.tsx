@@ -59,14 +59,9 @@ const HistoryPage = () => {
   const fetchHistory = async () => {
       try {
         const data = await getHistory();
-        // Filter to only show India policies and sort by timestamp (newest first)
+        // Filter to only show India policies (backend already sorted by timestamp)
         const filteredData = data.filter(item => item.region === "India" || !item.region);
-        const sortedData = filteredData.sort((a, b) => {
-          const dateA = new Date(a.timestamp || 0).getTime();
-          const dateB = new Date(b.timestamp || 0).getTime();
-          return dateB - dateA;
-        });
-        setHistoryData(sortedData);
+        setHistoryData(filteredData);
       } catch (error) {
         console.error("Failed to fetch history:", error);
         const errorMessage = error instanceof Error ? error.message : "Failed to load history";

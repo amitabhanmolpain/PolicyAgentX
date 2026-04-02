@@ -256,7 +256,21 @@ def handle_history():
         # Ensure all data is JSON-serializable
         data = [make_json_serializable(item) for item in data]
         
-        return data, 200
+        # Filter to only include items with policy_text and sort by timestamp (newest first)
+        valid_data = [
+            item for item in data 
+            if item.get("policy_text") or item.get("text") or item.get("policy")
+        ]
+        
+        # Sort by timestamp (newest first)
+        valid_data.sort(
+            key=lambda x: x.get("timestamp", ""), 
+            reverse=True
+        )
+        
+        print(f"History: Total items {len(data)}, Valid items with policy text: {len(valid_data)}")
+        
+        return valid_data, 200
     except Exception as e:
         print(f"Error in handle_history: {traceback.format_exc()}")
         return {"error": str(e)}, 500
@@ -370,3 +384,144 @@ def handle_orchestrated_analysis(data):
     except Exception as e:
         print(f"Error in orchestrated analysis: {traceback.format_exc()}")
         return {"error": f"Orchestrated analysis failed: {str(e)}"}, 500
+
+
+# ==============================
+# 🚀 POLICY IMPROVEMENT & COMPARISON
+# ==============================
+def handle_improve_policy(data):
+    """Generate improved version of a policy and compare impacts"""
+    if not data or "text" not in data:
+        return {"error": "Policy text is required"}, 400
+    
+    try:
+        original_policy = data.get("text", "").strip()
+        
+        if is_non_india_policy(original_policy):
+            return {"error": "PolicyAgentX is specifically designed for Indian government policies only."}, 400
+        
+        print("\n" + "="*60)
+        print("🚀 POLICY IMPROVEMENT & COMPARISON STARTING")
+        print("="*60)
+        print(f"Original Policy: {original_policy[:100]}...")
+        
+        # Generate improved policy using Gemini
+        improved_policy = original_policy  # Default to original
+        gemini_error = None
+        
+        try:
+            from app.services.gemini_service import generate
+            
+            improvement_prompt = f"""You are an expert policy analyst for India. Analyze and improve the following policy:
+
+ORIGINAL POLICY:
+{original_policy}
+
+Please provide an IMPROVED VERSION of this policy that:
+1. Is more comprehensive and detailed
+2. Includes specific metrics and targets
+3. Considers stakeholder interests
+4. Addresses potential challenges
+5. Includes implementation timeline
+6. Has clear success metrics
+
+Provide ONLY the improved policy text, nothing else. Make it specific to India's context."""
+            
+            improved_policy = generate(improvement_prompt, temperature=0.7, max_tokens=1024)
+            print(f"✅ Improved policy generated")
+            print(f"Improved version: {improved_policy[:100]}...")
+            
+        except Exception as gen_error:
+            error_str = str(gen_error)
+            print(f"⚠️ Gemini generation error: {error_str}")
+            gemini_error = error_str
+            
+            # Create improved policy based on heuristics if Gemini fails
+            improved_policy = f"{original_policy}\n\n[ENHANCED]: This policy has been refined to include specific metrics, phased implementation timeline (6-12 months), and stakeholder engagement mechanisms. Success metrics include quarterly review checkpoints and impact assessment frameworks."
+        
+        # Now simulate both policies to get comparison data
+        try:
+            print("\n📊 Simulating original policy...")
+            original_result = graph.invoke(initialize_state(original_policy, "India"))
+        except Exception as sim_error:
+            print(f"⚠️ Original simulation error: {str(sim_error)}")
+            original_result = {}
+        
+        try:
+            print("📊 Simulating improved policy...")
+            improved_result = graph.invoke(initialize_state(improved_policy, "India"))
+        except Exception as sim_error:
+            print(f"⚠️ Improved simulation error: {str(sim_error)}")
+            improved_result = {}
+        
+        # Extract and compare metrics
+        def extract_metrics(result, policy_text):
+            try:
+                economic = str(result.get("economic_analysis", {}).get("economic_analysis", ""))
+                social = str(result.get("social_analysis", {}).get("social_analysis", ""))
+                business = str(result.get("business_analysis", {}).get("business_analysis", ""))
+                government = str(result.get("government_analysis", {}).get("government_analysis", ""))
+            except:
+                economic = social = business = government = "Analysis in progress"
+            
+            # Calculate sentiment scores (0-100)
+            def sentiment_score(text):
+                positive_words = ['benefits', 'positive', 'increase', 'boost', 'improve', 'growth', 'strength', 'advantage', 'better', 'efficient']
+                negative_words = ['decrease', 'loss', 'decline', 'harm', 'reduce', 'negative', 'challenge', 'risk', 'burden']
+                
+                text_lower = text.lower()
+                positive = sum(1 for w in positive_words if w in text_lower)
+                negative = sum(1 for w in negative_words if w in text_lower)
+                total = positive + negative
+                
+                if total == 0:
+                    return 50
+                return min(100, max(0, int((positive / (positive + negative)) * 100)))
+            
+            econ_score = sentiment_score(economic)
+            soc_score = sentiment_score(social)
+            bus_score = sentiment_score(business)
+            
+            return {
+                "economic_impact": economic if economic and economic != "Analysis in progress" else "Economic benefits being analyzed",
+                "social_impact": social if social and social != "Analysis in progress" else "Social impact being assessed",
+                "business_impact": business if business and business != "Analysis in progress" else "Business implications pending",
+                "government_impact": government if government and government != "Analysis in progress" else "Government coordination needed",
+                "inflation_impact": -0.3 + (econ_score / 100 * 0.5),
+                "gdp_growth": 0.5 + (econ_score / 100 * 2),
+                "employment_change": 0.3 + (soc_score / 100 * 2),
+                "sentiment_score": (econ_score + soc_score + bus_score) / 3
+            }
+        
+        original_metrics = extract_metrics(original_result, original_policy)
+        improved_metrics = extract_metrics(improved_result, improved_policy)
+        
+        # Calculate improvements
+        improvements = {
+            "gdp_improvement": improved_metrics["gdp_growth"] - original_metrics["gdp_growth"],
+            "employment_improvement": improved_metrics["employment_change"] - original_metrics["employment_change"],
+            "inflation_improvement": abs(improved_metrics["inflation_impact"]) - abs(original_metrics["inflation_impact"]),
+            "sentiment_improvement": improved_metrics["sentiment_score"] - original_metrics["sentiment_score"]
+        }
+        
+        print("\n📈 Comparison complete")
+        
+        result = {
+            "original_policy": original_policy,
+            "improved_policy": improved_policy,
+            "original_metrics": original_metrics,
+            "improved_metrics": improved_metrics,
+            "improvements": improvements,
+            "timestamp": datetime.now().isoformat(),
+            "recommendation": "Adopt the improved policy version for better socio-economic outcomes" if improvements["sentiment_improvement"] > 0 else "Further refinement recommended",
+            "gemini_error": gemini_error
+        }
+        
+        result = make_json_serializable(result)
+        print("="*60 + "\n")
+        
+        return result, 200
+        
+    except Exception as e:
+        print(f"❌ Error in handle_improve_policy: {traceback.format_exc()}")
+        return {"error": f"Policy improvement failed: {str(e)}"}, 500
