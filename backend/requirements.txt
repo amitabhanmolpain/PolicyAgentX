@@ -24,3 +24,4 @@ sentence-transformers==5.3.0
 
 # Data processing
 pandas==2.2.3
+nltk==3.9.1

@@ -82,6 +82,104 @@ def _stem_tokens(text: str):
     return [_simple_stem(token) for token in re.findall(r"[a-zA-Z]+", text or "")]
 
 
+def _has_required_innovation_structure(text: str) -> bool:
+    """Check if text has required 'Original:', 'Upgrade:', 'Benefit:' structure"""
+    lower = (text or "").lower()
+    has_original = "original:" in lower
+    has_upgrade = "upgrade:" in lower
+    has_benefit = "benefit:" in lower
+    has_structure = has_original and has_upgrade and has_benefit
+    print(f"  Structure check: Original={has_original}, Upgrade={has_upgrade}, Benefit={has_benefit}, Overall={has_structure}")
+    return has_structure
+
+
+def _build_policy_innovation_fallback(original_policy: str) -> str:
+        policy_lower = original_policy.lower()
+
+        if any(keyword in policy_lower for keyword in ["subsid", "farmer", "agricultur", "crop", "rural"]):
+                return f"""Policy Name: Precision Farmer Support Grid
+
+Innovation Deltas From Original:
+- Original: {original_policy}
+    Upgrade: Replace blanket subsidy with a direct benefit transfer engine linked to land records, soil health cards, crop stage, and Aadhaar-verified farmer identity.
+    Benefit: Stops leakage, targets the real farmer, and pushes more subsidy into productive use.
+- Original: Flat subsidy for all eligible farmers.
+    Upgrade: Add dynamic subsidy scaling based on soil quality, crop type, rainfall stress, and market price risk.
+    Benefit: The poorest and most vulnerable farmers get higher support when they need it most.
+- Original: Manual approval and slow disbursement.
+    Upgrade: Create an automatic approval and payment system using verified digital records and local grievance redressal.
+    Benefit: Faster payout, lower corruption, and better trust in the policy.
+
+Execution Blueprint:
+- Phase 1 (0-6 months): Clean farmer records, connect land and soil databases, and launch a pilot in high-distress districts.
+- Phase 2 (6-18 months): Expand nationally, use AI to flag abnormal claims, and update subsidy values every season.
+
+Expected Measurable Outcomes:
+- GDP impact: 0.2% to 0.5% uplift from better farm productivity.
+- Employment impact: Higher rural income stability and seasonal job retention.
+- Inflation impact: Lower food supply shocks through healthier crop outcomes.
+
+Tech/AI Edge:
+- AI-based subsidy scoring engine.
+- Real-time soil and crop data sync for automatic subsidy adjustment.
+"""
+
+        if any(keyword in policy_lower for keyword in ["tax", "gst", "income tax", "revenue"]):
+                return f"""Policy Name: Smart Compliance & Relief Engine
+
+Innovation Deltas From Original:
+- Original: {original_policy}
+    Upgrade: Convert the policy into a digital compliance system with targeted relief for small taxpayers and automatic enforcement for high-value evaders.
+    Benefit: Higher collection efficiency without hurting honest households.
+- Original: One-size-fits-all tax action.
+    Upgrade: Use income bands, transaction data, and sector risk signals to customize relief and enforcement.
+    Benefit: Better fairness, better compliance, and less economic shock.
+- Original: Slow manual implementation.
+    Upgrade: Add real-time dashboards for administrators and automated notice generation for exceptional cases.
+    Benefit: Faster execution and less bureaucratic delay.
+
+Execution Blueprint:
+- Phase 1 (0-6 months): Build compliance dashboard, identify at-risk sectors, and pilot targeted relief.
+- Phase 2 (6-18 months): Roll out nationwide, link with digital records, and refine enforcement rules quarterly.
+
+Expected Measurable Outcomes:
+- GDP impact: 0.1% to 0.4% uplift from better efficiency.
+- Employment impact: Higher business confidence and formal sector growth.
+- Inflation impact: Limited inflation pressure due to targeted design.
+
+Tech/AI Edge:
+- Risk scoring AI for non-compliance.
+- Digital dashboard for live policy tuning.
+"""
+
+        return f"""Policy Name: Strategic Policy Upgrade
+
+Innovation Deltas From Original:
+- Original: {original_policy}
+    Upgrade: Turn the idea into a targeted, data-driven policy with automatic eligibility checks, phased rollout, and outcome-based disbursement.
+    Benefit: Less leakage, stronger execution, and better results for the intended group.
+- Original: Broad support without precision.
+    Upgrade: Add real-time monitoring, local verification, and dynamic benefit scaling based on need and performance.
+    Benefit: More efficient use of public money and higher trust.
+- Original: Manual implementation path.
+    Upgrade: Use a digital control room and quarterly policy review cycle to correct failures quickly.
+    Benefit: Faster corrections, stronger accountability, and better long-term impact.
+
+Execution Blueprint:
+- Phase 1 (0-6 months): Map beneficiaries, define eligibility rules, and launch a pilot.
+- Phase 2 (6-18 months): Expand the policy, automate monitoring, and refine using live outcomes.
+
+Expected Measurable Outcomes:
+- GDP impact: Moderate positive uplift from efficiency gains.
+- Employment impact: Better protection and more stable livelihoods.
+- Inflation impact: Controlled inflation risk due to targeted design.
+
+Tech/AI Edge:
+- Automated eligibility engine.
+- Outcome tracking dashboard for live policy improvement.
+"""
+
+
 # ==============================
 # 🔥 MAIN SIMULATION LOGIC
 # ==============================
@@ -430,28 +528,59 @@ def handle_improve_policy(data):
             improvement_prompt = f"""
 You are a bold, visionary Indian policy architect.
 
-A user has submitted this policy idea:
+Original policy idea:
 "{original_policy}"
 
-Your job is to generate a DRAMATICALLY IMPROVED version of this policy.
-Be creative, specific and ambitious. Include:
-- A catchy policy name
-- 3-4 radical but realistic improvements
-- Specific implementation steps (who, what, when)
-- Expected impact on GDP, employment, inflation
-- A phased rollout plan (Phase 1: 0-6 months, Phase 2: 6-18 months)
-- Any innovative tech or AI integrations possible
+Task:
+Create a UNIQUE improved policy that is clearly built from the original idea, but significantly better.
 
-Make it sound like it came from a genius think tank, not a government bureaucrat.
-Use clear, plain wording and avoid markdown symbols.
-Return as plain text, not JSON.
+Hard rules:
+1) Do NOT write generic explanations like "what this policy means".
+2) Do NOT criticize vaguely. Show exact upgrades over the original.
+3) Every innovation must be specific, implementable, and measurable.
+4) Use plain text only. No markdown symbols.
+5) Think like a decisive policymaker: propose one strong mechanism that changes how the policy actually works.
+6) If the original policy is about subsidies, benefits, welfare, tax, farmers, or households, upgrade it with direct targeting, live verification, automation, and leakage prevention.
+7) Avoid filler language. Every bullet must change the policy design in a meaningful way.
+
+Output format (strict):
+Policy Name: <short memorable name>
+
+Innovation Deltas From Original:
+- Original: <what original policy did>
+    Upgrade: <what you changed>
+    Benefit: <economic/social/government benefit in one line>
+- Original: ...
+    Upgrade: ...
+    Benefit: ...
+- Original: ...
+    Upgrade: ...
+    Benefit: ...
+
+Execution Blueprint:
+- Phase 1 (0-6 months): <owners, actions, enforcement>
+- Phase 2 (6-18 months): <scale-up, tech systems, course correction>
+
+Expected Measurable Outcomes:
+- GDP impact: <range or estimate>
+- Employment impact: <range or estimate>
+- Inflation impact: <range or estimate>
+
+Tech/AI Edge:
+- <1-2 concrete digital or AI mechanisms that make this policy superior>
 """
             
             improved_policy = generate(improvement_prompt, temperature=0.7, max_tokens=1024)
             if is_error_response(improved_policy):
                 raise RuntimeError(improved_policy["error"])
-            print(f"✅ Improved policy generated")
-            print(f"Improved version: {improved_policy[:100]}...")
+            
+            if not _has_required_innovation_structure(improved_policy):
+                print(f"⚠️ Model output missing required structure, using fallback instead")
+                gemini_error = "Model output format incorrect; using fallback"
+                improved_policy = _build_policy_innovation_fallback(original_policy)
+            else:
+                print(f"✅ Improved policy generated with correct structure")
+                print(f"Improved version: {improved_policy[:100]}...")
             
         except Exception as gen_error:
             error_str = str(gen_error)
@@ -459,7 +588,7 @@ Return as plain text, not JSON.
             gemini_error = error_str
             
             # Create improved policy based on heuristics if Gemini fails
-            improved_policy = f"{original_policy}\n\n[ENHANCED]: This policy has been refined to include specific metrics, phased implementation timeline (6-12 months), and stakeholder engagement mechanisms. Success metrics include quarterly review checkpoints and impact assessment frameworks."
+            improved_policy = _build_policy_innovation_fallback(original_policy)
         
         # Now simulate both policies to get comparison data
         try:

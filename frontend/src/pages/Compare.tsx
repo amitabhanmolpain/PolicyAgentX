@@ -112,6 +112,79 @@ const toSimplePolicySummary = (text: string): string => {
   return "This policy explains the main goal, who is affected, and how implementation can happen in India.";
 };
 
+const normalizeDisplayText = (text: string): string => {
+  return (text || "").replace(/_/g, " ").replace(/\s+/g, " ").trim();
+};
+
+type InnovationBlock = {
+  original: string;
+  upgrade: string;
+  benefit: string;
+};
+
+const getInnovationBlocks = (text: string): InnovationBlock[] => {
+  const lines = sanitizeText(text)
+    .split(/\n+/)
+    .map((line) => line.replace(/^\s*[-*#>\d.)]+\s*/, "").trim())
+    .filter((line) => line.length > 25);
+
+  const blocks: InnovationBlock[] = [];
+  let current: InnovationBlock | null = null;
+
+  for (const line of lines) {
+    const originalMatch = line.match(/^Original\s*:\s*(.+)$/i);
+    const upgradeMatch = line.match(/^Upgrade\s*:\s*(.+)$/i);
+    const benefitMatch = line.match(/^Benefit\s*:\s*(.+)$/i);
+
+    if (originalMatch) {
+      if (current && (current.original || current.upgrade || current.benefit)) {
+        blocks.push(current);
+      }
+      current = {
+        original: normalizeDisplayText(originalMatch[1]),
+        upgrade: "",
+        benefit: "",
+      };
+      continue;
+    }
+
+    if (upgradeMatch && current) {
+      current.upgrade = normalizeDisplayText(upgradeMatch[1]);
+      continue;
+    }
+
+    if (benefitMatch && current) {
+      current.benefit = normalizeDisplayText(benefitMatch[1]);
+      continue;
+    }
+
+    if (/^policy name\s*:/i.test(line) || /^execution blueprint\s*:/i.test(line) || /^expected measurable outcomes\s*:/i.test(line) || /^tech\/ai edge\s*:/i.test(line)) {
+      continue;
+    }
+
+    if (current && !current.upgrade) {
+      current.upgrade = normalizeDisplayText(line);
+    } else if (current && !current.benefit) {
+      current.benefit = normalizeDisplayText(line);
+    }
+  }
+
+  if (current && (current.original || current.upgrade || current.benefit)) {
+    blocks.push(current);
+  }
+
+  if (blocks.length > 0) {
+    return blocks.slice(0, 3);
+  }
+
+  const fallbackPoints = toPolicyPoints(text).slice(0, 3);
+  return fallbackPoints.map((point, index) => ({
+    original: index === 0 ? "Policy baseline" : "Existing gap",
+    upgrade: normalizeDisplayText(point),
+    benefit: "Direct improvement to policy execution and outcomes.",
+  }));
+};
+
 const getOriginalCons = (metrics: PolicyMetrics): string[] => {
   const sources = [
     metrics.economic_impact,
@@ -133,28 +206,46 @@ const getOriginalCons = (metrics: PolicyMetrics): string[] => {
     .filter((line) => line.length > 25)
     .filter((line) => countStemMatches(line, negativeKeywords) > 0);
 
-  const unique = Array.from(new Set(extracted)).slice(0, 5);
+  const unique = Array.from(new Set(extracted.map(simplifyCriticalCons))).slice(0, 5);
   if (unique.length > 0) {
     return unique;
   }
 
   const fallback: string[] = [];
   if (metrics.inflation_impact > 0) {
-    fallback.push("Inflation may rise and reduce household purchasing power.");
+    fallback.push("Prices can rise and hurt poor families first.");
   }
   if (metrics.employment_change < 0.5) {
-    fallback.push("Employment gains are limited under the current design.");
+    fallback.push("Jobs can fall or stay flat in the affected sector.");
   }
   if (metrics.sentiment_score < 60) {
-    fallback.push("Public sentiment may remain mixed due to unclear benefits.");
+    fallback.push("People may not trust the policy if benefits are unclear.");
   }
   if (metrics.gdp_growth < 1) {
-    fallback.push("GDP growth impact appears modest compared with potential alternatives.");
+    fallback.push("The policy is too weak to create strong growth.");
   }
 
   return fallback.length > 0
     ? fallback
-    : ["The original policy has unclear implementation and impact trade-offs."];
+    : ["The policy is too weak and may not deliver real results."];
+};
+
+const renderInnovationText = (text: string): string => {
+  return normalizeDisplayText(text || "No specific upgrade provided.");
+};
+
+const simplifyCriticalCons = (text: string): string => {
+  const lower = normalizeDisplayText(text).toLowerCase();
+
+  if (lower.includes("inflation")) return "Prices can rise and hurt poor families first.";
+  if (lower.includes("employment") || lower.includes("job")) return "Jobs can fall in the affected sector.";
+  if (lower.includes("small business") || lower.includes("msme") || lower.includes("business")) return "Small businesses can face higher costs and pressure.";
+  if (lower.includes("farmer") || lower.includes("agricultur") || lower.includes("rural")) return "Farmers may still lose money if support is not targeted well.";
+  if (lower.includes("inequality") || lower.includes("poor") || lower.includes("income")) return "Poor households may gain less than expected.";
+  if (lower.includes("delay") || lower.includes("implementation")) return "Slow rollout can block real benefits.";
+  if (lower.includes("leakage") || lower.includes("corruption") || lower.includes("middleman")) return "Money can leak before reaching the real beneficiary.";
+  if (lower.includes("risk") || lower.includes("burden") || lower.includes("cost")) return "The policy can create extra cost without enough gain.";
+  return "The policy is too weak and may not deliver real results.";
 };
 
 const AnimatedValue = ({ target, suffix = "", decimals = 1 }: { target: number; suffix?: string; decimals?: number }) => {
@@ -335,8 +426,25 @@ const ComparePage = () => {
       )}
       <h3 className="text-xl font-display font-bold text-foreground mb-2 mt-2 tracking-tight">{label}</h3>
       <div className="mb-8">
-        <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-2 font-semibold">What this policy means</p>
-        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-4">{toSimplePolicySummary(policy)}</p>
+        <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-2 font-semibold">
+          {isRecommended ? "What We Innovated And Why It Benefits" : "Original Policy Baseline"}
+        </p>
+        {isRecommended ? (
+          <div className="space-y-4">
+            {getInnovationBlocks(policy).map((block, idx) => (
+              <div key={`${idx}-${block.original.slice(0, 20)}`} className="rounded-2xl border border-emerald-500/15 bg-emerald-500/5 p-4 space-y-2">
+                <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">Original Gap</div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{renderInnovationText(block.original)}</p>
+                <div className="text-[9px] uppercase tracking-[0.18em] text-emerald-400 font-semibold">My Upgrade</div>
+                <p className="text-xs text-emerald-200 leading-relaxed">{renderInnovationText(block.upgrade)}</p>
+                <div className="text-[9px] uppercase tracking-[0.18em] text-cyan-400 font-semibold">Why It Wins</div>
+                <p className="text-xs text-cyan-200 leading-relaxed">{renderInnovationText(block.benefit)}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-4">{normalizeDisplayText(toSimplePolicySummary(policy))}</p>
+        )}
       </div>
       
       <div className="space-y-6 mt-4">
@@ -556,11 +664,11 @@ const ComparePage = () => {
           <div className="space-y-4">
             <div>
               <p className="text-[9px] text-muted-foreground uppercase mb-2">Economic Impact</p>
-              <p className="text-xs text-emerald-300 leading-relaxed">{data.original_metrics.economic_impact.slice(0, 150)}...</p>
+              <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.original_metrics.economic_impact).slice(0, 150)}...</p>
             </div>
             <div>
               <p className="text-[9px] text-muted-foreground uppercase mb-2">Social Impact</p>
-              <p className="text-xs text-emerald-300 leading-relaxed">{data.original_metrics.social_impact.slice(0, 150)}...</p>
+              <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.original_metrics.social_impact).slice(0, 150)}...</p>
             </div>
           </div>
         </GlowCard>
@@ -570,11 +678,11 @@ const ComparePage = () => {
           <div className="space-y-4">
             <div>
               <p className="text-[9px] text-muted-foreground uppercase mb-2">Economic Impact</p>
-              <p className="text-xs text-emerald-300 leading-relaxed">{data.improved_metrics.economic_impact.slice(0, 150)}...</p>
+              <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.improved_metrics.economic_impact).slice(0, 150)}...</p>
             </div>
             <div>
               <p className="text-[9px] text-muted-foreground uppercase mb-2">Social Impact</p>
-              <p className="text-xs text-emerald-300 leading-relaxed">{data.improved_metrics.social_impact.slice(0, 150)}...</p>
+              <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.improved_metrics.social_impact).slice(0, 150)}...</p>
             </div>
           </div>
         </GlowCard>
