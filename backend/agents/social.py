@@ -1,4 +1,4 @@
-from app.services.gemini_service import generate
+from app.services.gemini_service import generate, response_text
 
 
 def social_agent(state: dict) -> dict:
@@ -23,7 +23,7 @@ MIDDLE_CLASS_IMPACT:
 LOWER_INCOME_IMPACT:
 LIFESTYLE_CHANGES:"""
 
-    response = generate(prompt)
+    response = response_text(generate(prompt))
     
     result = {
         "social_analysis": response,

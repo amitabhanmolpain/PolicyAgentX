@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import GlowCard from "@/components/GlowCard";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 
 import { Award, Loader, AlertCircle } from "lucide-react";
 import { getHistory, improvePolicy } from "@/lib/api";
@@ -29,6 +30,110 @@ interface ComparisonData {
     sentiment_improvement: number;
   };
 }
+
+const sanitizeText = (text: string) => {
+  return (text || "")
+    .replace(/[\u2022\u25CF\u25A0\u2605\u2713\u2714]/g, " ")
+    .replace(/[^\w\s.,:%()\-\n]/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .trim();
+};
+
+const toPolicyPoints = (text: string): string[] => {
+  const lines = sanitizeText(text)
+    .split("\n")
+    .map((line) => line.replace(/^\s*[-*#>\d.)]+\s*/, "").trim())
+    .filter((line) => line.length > 20);
+
+  if (lines.length >= 3) {
+    return Array.from(new Set(lines)).slice(0, 8);
+  }
+
+  const sentencePoints = sanitizeText(text)
+    .split(/(?<=[.!?])\s+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 20);
+
+  return Array.from(new Set(sentencePoints)).slice(0, 8);
+};
+
+const toSimplePolicySummary = (text: string): string => {
+  const cleaned = (text || "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/#+\s*/g, " ")
+    .replace(/\*\*/g, " ")
+    .replace(/\*/g, " ")
+    .replace(/`/g, " ")
+    .replace(/\btitle\s*:/gi, " ")
+    .replace(/\bpolicy title\s*:/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const plain = sanitizeText(cleaned)
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const sentences = plain
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 20)
+    .slice(0, 2);
+
+  if (sentences.length > 0) {
+    return sentences.join(" ");
+  }
+
+  if (plain.length > 0) {
+    return plain.slice(0, 220);
+  }
+
+  return "This policy explains the main goal, who is affected, and how implementation can happen in India.";
+};
+
+const getOriginalCons = (metrics: PolicyMetrics): string[] => {
+  const sources = [
+    metrics.economic_impact,
+    metrics.social_impact,
+    metrics.business_impact,
+    metrics.government_impact,
+  ]
+    .map((text) => sanitizeText(text))
+    .join(" ");
+
+  const negativeKeywords = [
+    "risk", "burden", "challenge", "cost", "decline", "inflation", "loss",
+    "delay", "inequality", "unemployment", "resistance", "protest", "pressure",
+  ];
+
+  const extracted = sources
+    .split(/(?<=[.!?])\s+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 25)
+    .filter((line) => negativeKeywords.some((word) => line.toLowerCase().includes(word)));
+
+  const unique = Array.from(new Set(extracted)).slice(0, 5);
+  if (unique.length > 0) {
+    return unique;
+  }
+
+  const fallback: string[] = [];
+  if (metrics.inflation_impact > 0) {
+    fallback.push("Inflation may rise and reduce household purchasing power.");
+  }
+  if (metrics.employment_change < 0.5) {
+    fallback.push("Employment gains are limited under the current design.");
+  }
+  if (metrics.sentiment_score < 60) {
+    fallback.push("Public sentiment may remain mixed due to unclear benefits.");
+  }
+  if (metrics.gdp_growth < 1) {
+    fallback.push("GDP growth impact appears modest compared with potential alternatives.");
+  }
+
+  return fallback.length > 0
+    ? fallback
+    : ["The original policy has unclear implementation and impact trade-offs."];
+};
 
 const AnimatedValue = ({ target, suffix = "", decimals = 1 }: { target: number; suffix?: string; decimals?: number }) => {
   const [val, setVal] = useState(0);
@@ -187,7 +292,10 @@ const ComparePage = () => {
         </div>
       )}
       <h3 className="text-xl font-display font-bold text-foreground mb-2 mt-2 tracking-tight">{label}</h3>
-      <p className="text-xs text-muted-foreground mb-8 line-clamp-3">{policy}</p>
+      <div className="mb-8">
+        <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-2 font-semibold">What this policy means</p>
+        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-4">{toSimplePolicySummary(policy)}</p>
+      </div>
       
       <div className="space-y-6 mt-4">
         {[
@@ -254,6 +362,31 @@ const ComparePage = () => {
     );
   }
 
+  const improvedPolicyPoints = toPolicyPoints(data.improved_policy);
+  const originalPolicyCons = getOriginalCons(data.original_metrics);
+
+  const improvementChartData = [
+    { name: "GDP", value: Number(data.improvements.gdp_improvement.toFixed(2)) },
+    { name: "Employment", value: Number(data.improvements.employment_improvement.toFixed(2)) },
+    { name: "Sentiment", value: Number(data.improvements.sentiment_improvement.toFixed(2)) },
+    { name: "Inflation Stability", value: Number((-data.improvements.inflation_improvement).toFixed(2)) },
+  ];
+
+  const dynamicComparisonData = [
+    {
+      stage: "Original",
+      gdp: Number(data.original_metrics.gdp_growth.toFixed(2)),
+      employment: Number(data.original_metrics.employment_change.toFixed(2)),
+      sentiment: Number(data.original_metrics.sentiment_score.toFixed(2)),
+    },
+    {
+      stage: "Improved",
+      gdp: Number(data.improved_metrics.gdp_growth.toFixed(2)),
+      employment: Number(data.improved_metrics.employment_change.toFixed(2)),
+      sentiment: Number(data.improved_metrics.sentiment_score.toFixed(2)),
+    },
+  ];
+
   return (
     <div className="container mx-auto px-8 py-20 max-w-6xl">
       <motion.div
@@ -299,6 +432,81 @@ const ComparePage = () => {
         </motion.div>
       )}
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+        <GlowCard hoverable={false} className="p-8 bg-secondary/10 border-emerald-500/30">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-400 mb-5 font-bold">Improved Policy In Clear Points</p>
+          <ul className="space-y-3">
+            {improvedPolicyPoints.map((point, index) => (
+              <li key={`${index}-${point.slice(0, 20)}`} className="text-sm text-emerald-100 leading-relaxed">
+                {index + 1}. {point}
+              </li>
+            ))}
+          </ul>
+        </GlowCard>
+
+        <GlowCard hoverable={false} className="p-8 bg-secondary/10 border-rose-500/30">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-rose-400 mb-5 font-bold">Cons Of Original Policy</p>
+          <ul className="space-y-3">
+            {originalPolicyCons.map((item, index) => (
+              <li key={`${index}-${item.slice(0, 20)}`} className="text-sm text-rose-100 leading-relaxed">
+                {index + 1}. {item}
+              </li>
+            ))}
+          </ul>
+        </GlowCard>
+      </div>
+
+      <GlowCard hoverable={false} className="p-10 mb-12 bg-secondary/10 border-border/20">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-8 font-bold">Dynamic Graphs For Improved Policy</p>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="h-[280px]">
+            <p className="text-xs text-muted-foreground mb-4">Improvement by metric</p>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={improvementChartData}>
+                <CartesianGrid strokeDasharray="4 4" stroke="#2A2A31" />
+                <XAxis dataKey="name" stroke="#8E8E99" fontSize={11} />
+                <YAxis stroke="#8E8E99" fontSize={11} />
+                <Tooltip
+                  contentStyle={{
+                    background: "#151517",
+                    border: "1px solid #2A2A31",
+                    borderRadius: "10px",
+                    color: "#FFFFFF",
+                    fontSize: 12,
+                  }}
+                  formatter={(value) => [`${value}%`, "Improvement"]}
+                />
+                <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#10b981" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="h-[280px]">
+            <p className="text-xs text-muted-foreground mb-4">Original vs improved trend</p>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={dynamicComparisonData}>
+                <CartesianGrid strokeDasharray="4 4" stroke="#2A2A31" />
+                <XAxis dataKey="stage" stroke="#8E8E99" fontSize={11} />
+                <YAxis stroke="#8E8E99" fontSize={11} />
+                <Tooltip
+                  contentStyle={{
+                    background: "#151517",
+                    border: "1px solid #2A2A31",
+                    borderRadius: "10px",
+                    color: "#FFFFFF",
+                    fontSize: 12,
+                  }}
+                />
+                <Line type="monotone" dataKey="gdp" stroke="#34d399" strokeWidth={2} dot={{ r: 4 }} name="GDP" />
+                <Line type="monotone" dataKey="employment" stroke="#60a5fa" strokeWidth={2} dot={{ r: 4 }} name="Employment" />
+                <Line type="monotone" dataKey="sentiment" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} name="Sentiment" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </GlowCard>
+
       {/* Benefits Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <GlowCard hoverable={false} className="p-10 bg-secondary/10 border-border/20">
@@ -315,7 +523,7 @@ const ComparePage = () => {
           </div>
         </GlowCard>
 
-        <GlowCard hoverable={false} className="p-10 bg-secondary/10 border-border/20 border-emerald-500/30">
+        <GlowCard hoverable={false} className="p-10 bg-secondary/10 border-emerald-500/30">
           <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-400 mb-6 font-bold">✨ Improved Policy Benefits</p>
           <div className="space-y-4">
             <div>

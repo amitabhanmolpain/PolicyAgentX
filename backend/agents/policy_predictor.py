@@ -12,8 +12,11 @@ from typing import Dict, List, Any, Tuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
+import os
+from pathlib import Path
 
-from vertexai.generative_models import GenerativeModel
+import vertexai
+from vertexai.preview.generative_models import GenerativeModel
 
 
 # ─────────────────────────────────────────────
@@ -74,9 +77,37 @@ class PolicyPredictionEngine:
     """AI-powered policy impact prediction"""
     
     def __init__(self):
-        self.model = GenerativeModel("gemini-2.0-flash-001")
+        self.model = None
+        self._project_id = None
+        self._location = None
         self.india_population = 1400000000
         self.india_gdp_trillions = 3.5
+
+    def _ensure_model(self):
+        if self.model is not None:
+            return self.model
+
+        backend_dir = Path(__file__).resolve().parents[1]
+        service_account_path = backend_dir / "service-account.json"
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(service_account_path)
+
+        self._project_id = os.getenv("GCP_PROJECT_ID")
+        self._location = os.getenv("GCP_LOCATION", "us-central1")
+
+        if not self._project_id and service_account_path.exists():
+            try:
+                with service_account_path.open("r", encoding="utf-8") as handle:
+                    service_data = json.load(handle)
+                self._project_id = service_data.get("project_id")
+            except Exception:
+                self._project_id = None
+
+        if not self._project_id:
+            raise ValueError("GCP_PROJECT_ID environment variable not set")
+
+        vertexai.init(project=self._project_id, location=self._location)
+        self.model = GenerativeModel("gemini-2.5-flash")
+        return self.model
     
     def predict_financial_impact(self, policy_text: str, 
                                 historical_context: str = "") -> FinancialImpact:
@@ -111,7 +142,7 @@ IMPORTANT:
 - Assume 5% effective policy implementation rate (India avg)
 """
         
-        response = self.model.generate_content(prompt)
+        response = self._ensure_model().generate_content(prompt)
         impact_data = self._parse_json_response(response.text)
         
         revenue = impact_data.get("estimated_revenue_crores", 0)
@@ -167,7 +198,7 @@ Focus on:
 - Access to services
 - Savings capacity """
         
-        response = self.model.generate_content(prompt)
+        response = self._ensure_model().generate_content(prompt)
         impact_data = self._parse_json_response(response.text)
         
         return DemographicImpact(
@@ -210,7 +241,7 @@ Consider:
 
 Assume implementation starting Year 1 at 70% effectiveness, reaching 95% by Year 3."""
         
-        response = self.model.generate_content(prompt)
+        response = self._ensure_model().generate_content(prompt)
         projections_data = self._parse_json_array(response.text)
         
         projections = []

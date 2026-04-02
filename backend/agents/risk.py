@@ -1,4 +1,4 @@
-from app.services.gemini_service import generate
+from app.services.gemini_service import generate, response_text
 
 
 def risk_agent(state: dict) -> dict:
@@ -56,7 +56,7 @@ AFFECTED_GROUPS: [specific Indian groups, percentages, affected Indian states]
 PUBLIC_REACTION: [emotional triggers for Indians, Indian historical parallels, Indian media narrative]
 CONFIDENCE_SCORE: [percentage confidence in Indian context]"""
 
-    response = generate(prompt, temperature=0.8, max_tokens=2500)
+    response = response_text(generate(prompt, temperature=0.8, max_tokens=2500))
     
     result = {
         "risk_analysis": response,

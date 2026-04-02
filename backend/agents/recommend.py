@@ -1,4 +1,4 @@
-from app.services.gemini_service import generate
+from app.services.gemini_service import generate, response_text
 
 
 def recommend_policy(state: dict) -> dict:
@@ -54,7 +54,7 @@ OPTIMIZED_POLICY: [detailed policy proposal for India]
 WHY_BETTER: [comparative analysis for India with specific metrics]
 IMPLEMENTATION: [phasing for India, Indian pilot regions, Indian support mechanisms, timeline]"""
 
-    response = generate(prompt, temperature=0.7, max_tokens=2500)
+    response = response_text(generate(prompt, temperature=0.7, max_tokens=2500))
     
     result = {
         "recommendation_analysis": response,

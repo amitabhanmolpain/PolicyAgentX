@@ -14,7 +14,7 @@ from langgraph.graph import StateGraph, START, END
 
 from rag.policy_rag_retriever import PolicyRAGRetriever
 from agents.policy_predictor import PolicyPredictionEngine
-from app.services.gemini_service import generate
+from app.services.gemini_service import generate, response_text
 
 
 @dataclass
@@ -150,7 +150,7 @@ Provide brief analysis on:
 
 Format: Each on one line, max 15 words."""
         
-        response = generate(prompt)
+        response = response_text(generate(prompt))
         
         state["business_analysis"] = {
             "analysis": response,
@@ -181,7 +181,7 @@ Predict impact on:
 
 Format: Each on one line, max 15 words."""
         
-        response = generate(prompt)
+        response = response_text(generate(prompt))
         
         state["economic_analysis"] = {
             "analysis": response,
@@ -211,7 +211,7 @@ Assess:
 
 Format: Each on one line, max 15 words."""
         
-        response = generate(prompt)
+        response = response_text(generate(prompt))
         
         state["government_analysis"] = {
             "analysis": response,
@@ -251,7 +251,7 @@ Evaluate:
 
 Format: Each on one line, max 15 words."""
         
-        response = generate(prompt)
+        response = response_text(generate(prompt))
         
         state["social_analysis"] = {
             "analysis": response,

@@ -1,4 +1,4 @@
-from app.services.gemini_service import generate
+from app.services.gemini_service import generate, response_text
 
 
 def business_agent(state: dict) -> dict:
@@ -23,7 +23,7 @@ SMALL_BUSINESS_IMPACT:
 LARGE_INDUSTRY_IMPACT:
 SUPPLY_CHAIN_IMPACT:"""
 
-    response = generate(prompt)
+    response = response_text(generate(prompt))
     
     result = {
         "business_analysis": response,

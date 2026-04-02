@@ -410,7 +410,7 @@ def handle_improve_policy(data):
         gemini_error = None
         
         try:
-            from app.services.gemini_service import generate
+            from app.services.gemini_service import generate, is_error_response
             
             improvement_prompt = f"""You are an expert policy analyst for India. Analyze and improve the following policy:
 
@@ -428,6 +428,8 @@ Please provide an IMPROVED VERSION of this policy that:
 Provide ONLY the improved policy text, nothing else. Make it specific to India's context."""
             
             improved_policy = generate(improvement_prompt, temperature=0.7, max_tokens=1024)
+            if is_error_response(improved_policy):
+                raise RuntimeError(improved_policy["error"])
             print(f"✅ Improved policy generated")
             print(f"Improved version: {improved_policy[:100]}...")
             

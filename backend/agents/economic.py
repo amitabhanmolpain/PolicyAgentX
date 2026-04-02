@@ -1,4 +1,4 @@
-from app.services.gemini_service import generate
+from app.services.gemini_service import generate, response_text
 
 
 def economic_agent(state: dict) -> dict:
@@ -23,7 +23,7 @@ GDP_IMPACT:
 INFLATION_IMPACT:
 EMPLOYMENT_IMPACT:"""
 
-    response = generate(prompt)
+    response = response_text(generate(prompt))
     
     result = {
         "economic_analysis": response,
