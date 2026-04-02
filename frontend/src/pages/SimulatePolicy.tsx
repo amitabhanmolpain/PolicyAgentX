@@ -14,22 +14,6 @@ import {
 const policyTypes = ["Tax Reform", "Subsidy Program", "Trade Policy", "Monetary Policy", "Environmental Regulation"];
 const regions = ["India"];
 
-const trendData = [
-  { month: "Jan", inflation: 2.1, gdp: 3.2, employment: 95.1 },
-  { month: "Feb", inflation: 2.3, gdp: 3.0, employment: 95.3 },
-  { month: "Mar", inflation: 2.0, gdp: 3.5, employment: 95.0 },
-  { month: "Apr", inflation: 1.8, gdp: 3.8, employment: 95.6 },
-  { month: "May", inflation: 1.6, gdp: 4.1, employment: 96.0 },
-  { month: "Jun", inflation: 1.5, gdp: 4.3, employment: 96.2 },
-];
-
-const comparisonData = [
-  { name: "Inflation", value: -0.6 },
-  { name: "GDP", value: 1.1 },
-  { name: "Employment", value: 1.1 },
-  { name: "Sentiment", value: 0.8 },
-];
-
 const simpleStem = (word: string): string => {
   let token = (word || "").toLowerCase().replace(/[^a-z]/g, "");
   const suffixes = ["ingly", "edly", "ment", "tion", "sion", "ance", "ence", "ing", "ed", "ly", "es", "s"];
@@ -371,6 +355,48 @@ const SimulatePolicyPage = () => {
     ];
   };
 
+  const getDynamicTrendData = () => {
+    if (!apiResults) {
+      const months = ["Month 1", "Month 2", "Month 3", "Month 4", "Month 5", "Month 6"];
+      return months.map((month, i) => ({
+        month,
+        inflation: 2.5 - (i * 0.2),
+        gdp: 3.5 + (i * 0.3),
+        employment: 95 + (i * 0.25),
+      }));
+    }
+    
+    const months = ["Month 1", "Month 2", "Month 3", "Month 4", "Month 5", "Month 6"];
+    const economicScore = analyzeImpactSentiment(apiResults.economic_impact);
+    const baseSentiment = (economicScore - 50) / 50; // -1 to 1
+    
+    return months.map((month, i) => {
+      const monthIndex = (i + 1) / 6;
+      return {
+        month,
+        inflation: Math.max(1.0, 2.5 - (i * 0.25) - (baseSentiment * 0.5)),
+        gdp: 3.0 + (i * 0.4) + (baseSentiment * 0.8),
+        employment: 94.5 + (i * 0.3) + (baseSentiment * 0.5),
+      };
+    });
+  };
+
+  const getDynamicComparisonData = () => {
+    if (!apiResults) return [];
+    
+    const economicScore = analyzeImpactSentiment(apiResults.economic_impact);
+    const socialScore = analyzeImpactSentiment(apiResults.social_impact);
+    const businessScore = analyzeImpactSentiment(apiResults.business_impact);
+    const governmentScore = analyzeImpactSentiment(apiResults.government_impact);
+    
+    return [
+      { name: "Economic", value: economicScore },
+      { name: "Social", value: socialScore },
+      { name: "Business", value: businessScore },
+      { name: "Government", value: governmentScore },
+    ];
+  };
+
   const getScoreColor = (score: number) => {
     if (score < 30) return "#ef4444"; // red
     if (score < 50) return "#eab308"; // yellow
@@ -405,33 +431,32 @@ const SimulatePolicyPage = () => {
       </AnimatePresence>
 
       {/* Dynamic Header */}
-      <div className="flex-none pt-8 pb-4 text-center bg-background/50 backdrop-blur-md z-40">
-        <div className="flex items-center justify-center gap-3 mb-2">
-          <h1 className="text-2xl md:text-3xl font-display font-bold text-gradient tracking-tight">
-            Policy Agent X
-          </h1>
-          <span className="px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/50 text-orange-400 text-[10px] font-bold uppercase tracking-[0.1em]">
-            🇮🇳 India Only
-          </span>
+      <div className="flex-none px-4 md:px-0 pt-5 pb-4 bg-background/50 backdrop-blur-md z-40 border-b border-border/10">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-display font-bold text-gradient tracking-tight">
+              Policy Agent X
+            </h1>
+            <span className="px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/50 text-orange-400 text-[8px] font-bold uppercase tracking-[0.1em]">
+              🇮🇳 India Only
+            </span>
+          </div>
           <Button
             onClick={handleNewChat}
             variant="outline"
             size="sm"
-            className="ml-auto mr-4 flex items-center gap-2"
+            className="flex items-center gap-1.5 h-8 text-xs"
             title="Start new chat"
           >
-            <RotateCcw className="w-4 h-4" />
-            <span className="hidden sm:inline text-[10px]">New Chat</span>
+            <RotateCcw className="w-3 h-3" />
+            <span>New Chat</span>
           </Button>
         </div>
-        <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.2em] mt-1 opacity-60">
-          Intelligent Research Assistant for Indian Policies
-        </p>
       </div>
 
       {/* Main Scroller Area */}
       <div className="flex-1 px-4 md:px-0">
-        <div className="max-w-4xl mx-auto w-full py-8 md:py-12 flex flex-col gap-10 pb-[150px]">
+        <div className="max-w-4xl mx-auto w-full py-6 md:py-8 flex flex-col gap-6 pb-[140px]">
           <ChatMessageList messages={messages} loading={loading} />
 
           <AnimatePresence>
@@ -442,84 +467,84 @@ const SimulatePolicyPage = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 30 }}
                 transition={{ duration: 0.6, ease: "easeOut" }}
-                className="space-y-12 pt-12 border-t border-border/20"
+                className="space-y-6 pt-8 border-t border-border/20"
               >
-                <div className="flex items-center gap-4 px-4 overflow-hidden">
-                   <div className="h-px bg-border/40 flex-1" />
-                   <h2 className="text-[10px] font-display font-medium text-muted-foreground uppercase tracking-[0.4em]">Simulation Intelligence Model</h2>
-                   <div className="h-px bg-border/40 flex-1" />
+                {/* Section Header */}
+                <div className="space-y-4 px-2 md:px-0">
+                  <h2 className="text-sm font-display font-bold text-white tracking-tight">Analysis Results</h2>
+                  <div className="h-px bg-gradient-to-r from-border/30 to-transparent" />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-2 md:px-0">
+                {/* Quick Impact Summary */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-2 md:px-0">
                   {apiResults && [
-                    { label: "Economic Impact", value: apiResults.economic_impact || "N/A", positive: true },
-                    { label: "Social Impact", value: apiResults.social_impact || "N/A", positive: true },
-                    { label: "Business Impact", value: apiResults.business_impact || "N/A", positive: true },
-                    { label: "Government Impact", value: apiResults.government_impact || "N/A", positive: true },
-                  ].map((r, i) => (
-                    <GlowCard
-                      key={r.label}
-                      delay={i * 0.05}
-                      className="p-10 bg-secondary/20 border border-border/50 backdrop-blur-sm min-h-[420px] flex flex-col justify-start"
-                    >
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-[0.15em] mb-4 font-bold opacity-80">{r.label}</p>
-                      
-                      {/* Impact Score Visualization */}
-                      <div className="mb-6">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[9px] text-muted-foreground uppercase">Impact Score</span>
-                          <span className="text-sm font-bold text-emerald-400">{analyzeImpactSentiment(r.value)}%</span>
+                    { label: "Economic", value: apiResults.economic_impact, color: "from-blue-500 to-blue-400" },
+                    { label: "Social", value: apiResults.social_impact, color: "from-emerald-500 to-emerald-400" },
+                    { label: "Business", value: apiResults.business_impact, color: "from-purple-500 to-purple-400" },
+                    { label: "Government", value: apiResults.government_impact, color: "from-amber-500 to-amber-400" },
+                  ].map((r, i) => {
+                    const score = analyzeImpactSentiment(r.value);
+                    return (
+                      <motion.div
+                        key={r.label}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: i * 0.1 }}
+                        className="p-4 rounded-xl border border-border/30 bg-secondary/30 backdrop-blur-sm"
+                      >
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-[0.1em] mb-2 font-bold">{r.label}</p>
+                        <div className="mb-2">
+                          <span className={`text-xl font-bold bg-gradient-to-r ${r.color} bg-clip-text text-transparent`}>{score}%</span>
                         </div>
-                        <div className="w-full h-2 bg-secondary/50 rounded-full overflow-hidden">
+                        <div className="w-full h-1.5 bg-secondary/50 rounded-full overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
-                            animate={{ width: `${analyzeImpactSentiment(r.value)}%` }}
+                            animate={{ width: `${score}%` }}
                             transition={{ duration: 1, ease: "easeOut" }}
-                            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400"
+                            className={`h-full rounded-full bg-gradient-to-r ${r.color}`}
                           />
                         </div>
-                      </div>
-
-                      {/* Impact Details */}
-                      <div className="flex-1 space-y-3 mb-4">
-                        {r.value.split('\n').map((line, idx) => {
-                          const cleanLine = line.trim();
-                          if (!cleanLine) return null;
-                          return (
-                            <div key={idx} className="flex gap-3">
-                              <span className="text-emerald-400 font-bold text-sm flex-shrink-0">•</span>
-                              <p className="text-xs text-emerald-300 leading-relaxed break-words">{normalizeDisplayText(cleanLine)}</p>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Sentiment Indicator */}
-                      <div className="flex gap-2 pt-4 border-t border-border/30">
-                        {[
-                          { label: "Positive", color: "#10b981", value: countStemMatches(r.value, ["benefits", "positive", "increase", "boost", "improve", "growth"]) },
-                          { label: "Negative", color: "#ef4444", value: countStemMatches(r.value, ["decrease", "loss", "decline", "harm", "reduce", "negative"]) },
-                          { label: "Neutral", color: "#6b7280", value: countStemMatches(r.value, ["unchanged", "stable", "maintain"]) },
-                        ].map((sentiment) => (
-                          <div key={sentiment.label} className="flex-1 text-center">
-                            <div className="text-[8px] text-muted-foreground mb-1 uppercase">{sentiment.label}</div>
-                            <div className="text-lg font-bold" style={{ color: sentiment.color }}>{sentiment.value}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </GlowCard>
-                  ))}
+                      </motion.div>
+                    );
+                  })}
                 </div>
 
+                {/* Detailed Impact Analysis */}
+                <GlowCard hoverable={false} className="p-8 bg-secondary/10 border-border/20">
+                  <p className={labelClass + " mb-0"}>Impact Details</p>
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {apiResults && [
+                      { label: "Economic & Social", value: apiResults.economic_impact + "\n" + apiResults.social_impact },
+                      { label: "Business & Government", value: apiResults.business_impact + "\n" + apiResults.government_impact },
+                    ].map((section, idx) => (
+                      <div key={idx} className="space-y-4">
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-[0.15em] font-bold">{section.label}</p>
+                        <div className="space-y-2">
+                          {section.value.split('\n').slice(0, 4).map((line, lineIdx) => {
+                            const cleanLine = line.trim();
+                            if (!cleanLine || cleanLine.length < 10) return null;
+                            return (
+                              <div key={lineIdx} className="flex gap-2">
+                                <span className="text-accent font-bold text-xs flex-shrink-0 mt-0.5">→</span>
+                                <p className="text-xs text-muted-foreground leading-relaxed">{normalizeDisplayText(cleanLine).slice(0, 100)}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </GlowCard>
+
                 {/* Overall Impact Chart */}
-                <GlowCard hoverable={false} className="p-10 bg-secondary/10 border-border/20 mt-12">
-                  <p className={labelClass + " mb-0"}>Overall Impact Analysis</p>
-                  <div className="mt-6">
-                    <ResponsiveContainer width="100%" height={300}>
+                <GlowCard hoverable={false} className="p-6 bg-secondary/10 border-border/20">
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-semibold mb-4">Overall Impact Score</p>
+                  <div>
+                    <ResponsiveContainer width="100%" height={250}>
                       <BarChart data={getImpactChartData()}>
                         <CartesianGrid strokeDasharray="8 8" stroke="#1F1F23" vertical={false} />
-                        <XAxis dataKey="name" stroke="#71717A" fontSize={11} tickLine={false} axisLine={false} />
-                        <YAxis stroke="#71717A" fontSize={11} tickLine={false} axisLine={false} domain={[0, 100]} />
+                        <XAxis dataKey="name" stroke="#71717A" fontSize={10} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#71717A" fontSize={10} tickLine={false} axisLine={false} domain={[0, 100]} />
                         <Tooltip 
                           contentStyle={{ background: "#0B0B0C", border: "1px solid #1F1F23", borderRadius: "12px", fontSize: 11 }}
                           formatter={(value) => [`${value}% Positive`, "Score"]}
@@ -535,20 +560,20 @@ const SimulatePolicyPage = () => {
                   </div>
                 </GlowCard>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 px-2 md:px-0 pb-16">
-                  <GlowCard hoverable={false} className="p-8 bg-secondary/10 border-border/20">
-                    <div className="flex items-center justify-between mb-8">
-                      <p className={labelClass + " mb-0"}>Trend Analysis</p>
-                      <div className="flex gap-4">
-                        <div className="flex items-center gap-1.5 font-bold"><div className="w-1.5 h-1.5 rounded-full bg-white"/><span className="text-[9px] text-muted-foreground uppercase">GDP</span></div>
-                        <div className="flex items-center gap-1.5 font-bold"><div className="w-1.5 h-1.5 rounded-full bg-accent"/><span className="text-[9px] text-muted-foreground uppercase">INF</span></div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 px-2 md:px-0">
+                  <GlowCard hoverable={false} className="p-6 bg-secondary/10 border-border/20">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-semibold">Trend Forecast</p>
+                      <div className="flex gap-3">
+                        <div className="flex items-center gap-1"><div className="w-1 h-1 rounded-full bg-white"/><span className="text-[8px] text-muted-foreground uppercase">GDP</span></div>
+                        <div className="flex items-center gap-1"><div className="w-1 h-1 rounded-full bg-indigo-400"/><span className="text-[8px] text-muted-foreground uppercase">INF</span></div>
                       </div>
                     </div>
-                    <ResponsiveContainer width="100%" height={240}>
-                      <LineChart data={trendData}>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <LineChart data={getDynamicTrendData()}>
                         <CartesianGrid strokeDasharray="8 8" stroke="#1F1F23" vertical={false} />
-                        <XAxis dataKey="month" stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dy: 10}} />
-                        <YAxis stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dx: -10}} />
+                        <XAxis dataKey="month" stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dy: 8}} />
+                        <YAxis stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dx: -8}} />
                         <Tooltip contentStyle={{ background: "#0B0B0C", border: "1px solid #1F1F23", borderRadius: "12px", fontSize: 10 }} />
                         <Line type="monotone" dataKey="gdp" stroke="#FFFFFF" strokeWidth={2.5} dot={false} />
                         <Line type="monotone" dataKey="inflation" stroke="#6366F1" strokeWidth={2.5} dot={false} />
@@ -556,15 +581,15 @@ const SimulatePolicyPage = () => {
                     </ResponsiveContainer>
                   </GlowCard>
 
-                  <GlowCard hoverable={false} className="p-8 bg-secondary/10 border-border/20">
-                    <p className={labelClass}>Impact Comparison</p>
-                    <ResponsiveContainer width="100%" height={240}>
-                      <BarChart data={comparisonData}>
+                  <GlowCard hoverable={false} className="p-6 bg-secondary/10 border-border/20">
+                    <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-semibold mb-4">Impact Distribution</p>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={getDynamicComparisonData()}>
                         <CartesianGrid strokeDasharray="8 8" stroke="#1F1F23" vertical={false} />
-                        <XAxis dataKey="name" stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dy: 10}} />
-                        <YAxis stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dx: -10}} />
+                        <XAxis dataKey="name" stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dy: 8}} />
+                        <YAxis stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dx: -8}} />
                         <Tooltip contentStyle={{ background: "#0B0B0C", border: "1px solid #1F1F23", borderRadius: "12px", fontSize: 10 }} />
-                        <Bar dataKey="value" fill="#FFFFFF" radius={[4, 4, 0, 0]} barSize={40} />
+                        <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} barSize={35} />
                       </BarChart>
                     </ResponsiveContainer>
                   </GlowCard>

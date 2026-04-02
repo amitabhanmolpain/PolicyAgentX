@@ -96,87 +96,155 @@ def _has_required_innovation_structure(text: str) -> bool:
 def _build_policy_innovation_fallback(original_policy: str) -> str:
         policy_lower = original_policy.lower()
 
-        if any(keyword in policy_lower for keyword in ["subsid", "farmer", "agricultur", "crop", "rural"]):
-                return f"""Policy Name: Precision Farmer Support Grid
+        def _policy_focus() -> str:
+            if any(keyword in policy_lower for keyword in ["tariff", "import", "export", "trade", "customs"]):
+                return "Original Policy Focus: A trade or tariff measure that affects imports, domestic prices, and industry competitiveness."
+            if any(keyword in policy_lower for keyword in ["subsid", "farmer", "agricultur", "crop", "rural"]):
+                return "Original Policy Focus: A support policy for farmers, rural households, or agricultural production."
+            if any(keyword in policy_lower for keyword in ["tax", "gst", "income tax", "revenue"]):
+                return "Original Policy Focus: A tax, compliance, or revenue policy that changes how money is collected or redistributed."
+            if any(keyword in policy_lower for keyword in ["health", "hospital", "medicine", "clinic"]):
+                return "Original Policy Focus: A health policy that changes access, affordability, or service delivery."
+            if any(keyword in policy_lower for keyword in ["education", "school", "college", "student", "skill"]):
+                return "Original Policy Focus: An education or skill-building policy that changes access and outcomes."
+            if any(keyword in policy_lower for keyword in ["housing", "rent", "home", "shelter"]):
+                return "Original Policy Focus: A housing policy that changes affordability and access to shelter."
+            if any(keyword in policy_lower for keyword in ["energy", "power", "electric", "renewable"]):
+                return "Original Policy Focus: An energy policy that changes prices, access, or sustainability."
+            return "Original Policy Focus: A general public policy that needs sharper targeting, clearer execution, and measurable outcomes."
 
-Innovation Deltas From Original:
-- Original: {original_policy}
-    Upgrade: Replace blanket subsidy with a direct benefit transfer engine linked to land records, soil health cards, crop stage, and Aadhaar-verified farmer identity.
-    Benefit: Stops leakage, targets the real farmer, and pushes more subsidy into productive use.
-- Original: Flat subsidy for all eligible farmers.
-    Upgrade: Add dynamic subsidy scaling based on soil quality, crop type, rainfall stress, and market price risk.
-    Benefit: The poorest and most vulnerable farmers get higher support when they need it most.
-- Original: Manual approval and slow disbursement.
-    Upgrade: Create an automatic approval and payment system using verified digital records and local grievance redressal.
-    Benefit: Faster payout, lower corruption, and better trust in the policy.
+        def _policy_name() -> str:
+            if any(keyword in policy_lower for keyword in ["tariff", "import", "export", "trade", "customs"]):
+                return "Competitiveness-First Trade Shield"
+            if any(keyword in policy_lower for keyword in ["subsid", "farmer", "agricultur", "crop", "rural"]):
+                return "Precision Rural Support Grid"
+            if any(keyword in policy_lower for keyword in ["tax", "gst", "income tax", "revenue"]):
+                return "Smart Compliance and Relief Engine"
+            if any(keyword in policy_lower for keyword in ["health", "hospital", "medicine", "clinic"]):
+                return "Targeted Health Access Accelerator"
+            if any(keyword in policy_lower for keyword in ["education", "school", "college", "student", "skill"]):
+                return "Outcome-Led Learning Upgrade"
+            if any(keyword in policy_lower for keyword in ["housing", "rent", "home", "shelter"]):
+                return "Affordable Housing Access Platform"
+            if any(keyword in policy_lower for keyword in ["energy", "power", "electric", "renewable"]):
+                return "Grid Efficiency and Energy Relief Plan"
+            return "Strategic Policy Upgrade"
 
-Execution Blueprint:
-- Phase 1 (0-6 months): Clean farmer records, connect land and soil databases, and launch a pilot in high-distress districts.
-- Phase 2 (6-18 months): Expand nationally, use AI to flag abnormal claims, and update subsidy values every season.
-
-Expected Measurable Outcomes:
-- GDP impact: 0.2% to 0.5% uplift from better farm productivity.
-- Employment impact: Higher rural income stability and seasonal job retention.
-- Inflation impact: Lower food supply shocks through healthier crop outcomes.
-
-Tech/AI Edge:
-- AI-based subsidy scoring engine.
-- Real-time soil and crop data sync for automatic subsidy adjustment.
+        def _innovation_blocks() -> str:
+            if any(keyword in policy_lower for keyword in ["tariff", "import", "export", "trade", "customs"]):
+                return f"""- Original: {original_policy}
+    Upgrade: Replace a blunt tariff with a tiered trade framework that protects essential goods, applies higher rates to non-essential luxury imports, and gives relief to critical industrial inputs.
+    Benefit: Domestic industry gets protection without creating avoidable price shocks for consumers or manufacturers.
+- Original: A single tariff rule for all imports.
+    Upgrade: Add automatic exemption checks for medicines, raw materials, and export-linked sectors, with monthly review triggers based on inflation and supply shortages.
+    Benefit: The policy becomes more precise and avoids hurting sectors that need imported inputs.
+- Original: Manual enforcement and static rates.
+    Upgrade: Use customs analytics, sector dashboards, and phased rollout to detect leakage, route violations, and update rates when market conditions change.
+    Benefit: Better compliance, less smuggling, and faster correction when the policy overshoots.
 """
 
-        if any(keyword in policy_lower for keyword in ["tax", "gst", "income tax", "revenue"]):
-                return f"""Policy Name: Smart Compliance & Relief Engine
-
-Innovation Deltas From Original:
-- Original: {original_policy}
-    Upgrade: Convert the policy into a digital compliance system with targeted relief for small taxpayers and automatic enforcement for high-value evaders.
-    Benefit: Higher collection efficiency without hurting honest households.
-- Original: One-size-fits-all tax action.
-    Upgrade: Use income bands, transaction data, and sector risk signals to customize relief and enforcement.
-    Benefit: Better fairness, better compliance, and less economic shock.
-- Original: Slow manual implementation.
-    Upgrade: Add real-time dashboards for administrators and automated notice generation for exceptional cases.
-    Benefit: Faster execution and less bureaucratic delay.
-
-Execution Blueprint:
-- Phase 1 (0-6 months): Build compliance dashboard, identify at-risk sectors, and pilot targeted relief.
-- Phase 2 (6-18 months): Roll out nationwide, link with digital records, and refine enforcement rules quarterly.
-
-Expected Measurable Outcomes:
-- GDP impact: 0.1% to 0.4% uplift from better efficiency.
-- Employment impact: Higher business confidence and formal sector growth.
-- Inflation impact: Limited inflation pressure due to targeted design.
-
-Tech/AI Edge:
-- Risk scoring AI for non-compliance.
-- Digital dashboard for live policy tuning.
+            if any(keyword in policy_lower for keyword in ["subsid", "farmer", "agricultur", "crop", "rural"]):
+                return f"""- Original: {original_policy}
+    Upgrade: Replace blanket subsidy delivery with direct benefit transfer linked to verified land records, crop stage, and local distress signals.
+    Benefit: Stops leakage and sends support to the intended farmers faster.
+- Original: Flat support for everyone.
+    Upgrade: Scale assistance by crop type, rainfall stress, market price shock, and farm size so vulnerable households receive more when risk is highest.
+    Benefit: Better targeting improves fairness and impact.
+- Original: Manual approval and slow payout.
+    Upgrade: Add digital eligibility checks, auto-approval for verified cases, and a grievance dashboard for local officers.
+    Benefit: Faster disbursement and higher public trust.
 """
 
-        return f"""Policy Name: Strategic Policy Upgrade
+            if any(keyword in policy_lower for keyword in ["tax", "gst", "income tax", "revenue"]):
+                return f"""- Original: {original_policy}
+    Upgrade: Convert the policy into a targeted compliance system with relief for honest small taxpayers and stronger checks for high-risk evasion.
+    Benefit: Better revenue collection without punishing low-risk households.
+- Original: One-size-fits-all enforcement.
+    Upgrade: Use income bands, sector risk scores, and transaction patterns to customize enforcement and relief.
+    Benefit: The policy becomes fairer and causes less economic friction.
+- Original: Slow manual processing.
+    Upgrade: Add live dashboards, automated notices, and quarterly policy reviews for administrators.
+    Benefit: Faster implementation and fewer administrative bottlenecks.
+"""
 
-Innovation Deltas From Original:
-- Original: {original_policy}
-    Upgrade: Turn the idea into a targeted, data-driven policy with automatic eligibility checks, phased rollout, and outcome-based disbursement.
-    Benefit: Less leakage, stronger execution, and better results for the intended group.
+            if any(keyword in policy_lower for keyword in ["health", "hospital", "medicine", "clinic"]):
+                return f"""- Original: {original_policy}
+    Upgrade: Shift from a broad health push to targeted service delivery using verified patient groups, local facility mapping, and priority coverage for high-risk districts.
+    Benefit: Better access for the people who need care most.
+- Original: Generic access improvement.
+    Upgrade: Add appointment routing, medicine stock tracking, and outcome monitoring at district level.
+    Benefit: Less waiting, fewer shortages, and stronger service quality.
+- Original: Manual execution.
+    Upgrade: Use a digital health control room with alerts for delays, shortages, and underperforming facilities.
+    Benefit: Faster correction and better accountability.
+"""
+
+            if any(keyword in policy_lower for keyword in ["education", "school", "college", "student", "skill"]):
+                return f"""- Original: {original_policy}
+    Upgrade: Redesign the policy around targeted learning outcomes, student support, and local skill pathways instead of a broad funding promise.
+    Benefit: More of the budget reaches actual learning improvement.
+- Original: Uniform support for all institutions.
+    Upgrade: Tie funding to attendance, learning gains, and local labor demand so resources flow to the best-performing programs.
+    Benefit: Higher quality and better job relevance.
+- Original: Slow monitoring.
+    Upgrade: Add outcome dashboards for schools and districts with quarterly review cycles.
+    Benefit: Problems are caught earlier and fixed faster.
+"""
+
+            if any(keyword in policy_lower for keyword in ["housing", "rent", "home", "shelter"]):
+                return f"""- Original: {original_policy}
+    Upgrade: Turn the idea into a targeted housing access program with verified beneficiary lists, location-based rent support, and phased construction support.
+    Benefit: Support reaches families under the highest housing pressure.
+- Original: Broad housing help.
+    Upgrade: Prioritize low-income households, migrant workers, and high-rent urban zones using local affordability data.
+    Benefit: The policy becomes more equitable and cost-effective.
+- Original: Slow rollout.
+    Upgrade: Add a digital allocation dashboard and quarterly market review to adjust subsidies and supply targets.
+    Benefit: Better pace and less waste.
+"""
+
+            if any(keyword in policy_lower for keyword in ["energy", "power", "electric", "renewable"]):
+                return f"""- Original: {original_policy}
+    Upgrade: Redesign the policy around targeted power relief, grid efficiency, and support for cleaner generation instead of a broad subsidy.
+    Benefit: Lower power waste and more reliable supply.
+- Original: Static support across users.
+    Upgrade: Use usage bands, peak demand data, and outage signals to direct support where stress is highest.
+    Benefit: Better system stability and fairer pricing.
+- Original: Manual monitoring.
+    Upgrade: Add a live grid dashboard and automated alerts for loss, overload, and regional shortages.
+    Benefit: Faster response and lower technical losses.
+"""
+
+            return f"""- Original: {original_policy}
+    Upgrade: Make the policy targeted, measurable, and tied to verified outcomes instead of using a broad one-size-fits-all rollout.
+    Benefit: Less leakage, better execution, and stronger results for the intended group.
 - Original: Broad support without precision.
     Upgrade: Add real-time monitoring, local verification, and dynamic benefit scaling based on need and performance.
-    Benefit: More efficient use of public money and higher trust.
+    Benefit: Public money is used more efficiently and trust improves.
 - Original: Manual implementation path.
-    Upgrade: Use a digital control room and quarterly policy review cycle to correct failures quickly.
+    Upgrade: Use a digital control room and a quarterly review cycle to correct failures quickly.
     Benefit: Faster corrections, stronger accountability, and better long-term impact.
+"""
+
+        return f"""Policy Name: {_policy_name()}
+
+{_policy_focus()}
+
+Innovation Deltas From Original:
+{_innovation_blocks()}
 
 Execution Blueprint:
-- Phase 1 (0-6 months): Map beneficiaries, define eligibility rules, and launch a pilot.
-- Phase 2 (6-18 months): Expand the policy, automate monitoring, and refine using live outcomes.
+- Phase 1 (0-6 months): Define eligibility rules, build the digital workflow, and pilot the policy in high-need districts or sectors.
+- Phase 2 (6-18 months): Scale nationally, monitor outcomes monthly, and tighten rules based on real performance data.
 
 Expected Measurable Outcomes:
-- GDP impact: Moderate positive uplift from efficiency gains.
-- Employment impact: Better protection and more stable livelihoods.
-- Inflation impact: Controlled inflation risk due to targeted design.
+- GDP impact: Moderate positive uplift from better targeting and lower leakage.
+- Employment impact: Higher stability in the affected sector and stronger local confidence.
+- Inflation impact: Controlled risk through phased rollout and exemption logic.
 
 Tech/AI Edge:
-- Automated eligibility engine.
-- Outcome tracking dashboard for live policy improvement.
+- Automated eligibility and verification engine.
+- Live dashboard for monitoring leakage, delays, and outcome drift.
 """
 
 
