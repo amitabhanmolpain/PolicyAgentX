@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import GlowCard from "@/components/GlowCard";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 
-import { Award, Loader, AlertCircle } from "lucide-react";
+import { Award, Loader, AlertCircle, AlertTriangle } from "lucide-react";
 import { getHistory, improvePolicy } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -116,14 +116,149 @@ const normalizeDisplayText = (text: string): string => {
   return (text || "").replace(/_/g, " ").replace(/\s+/g, " ").trim();
 };
 
+const isControversialPolicy = (text: string): boolean => {
+  const controversialKeywords = [
+    "removal", "expulsion", "ban", "discriminat", "religion", "communal", "riot", "violence",
+    "caste", "hindu", "muslim", "christian", "sikh", "buddha", "jew", "minority", "majority",
+    "ethnic", "racial", "persecution", "genocide", "massacre", "pogrom", "cleansing",
+    "sectarian", "religious hatred", "religious conflict", "communal violence", "riots",
+    "targeted killing", "targeted attack", "religious targeting", "faith-based discrimination",
+    "anti-semitism", "islamophobia", "hinduphobia", "christianophobia", "religious intolerance"
+  ];
+  
+  const lower = (text || "").toLowerCase();
+  return controversialKeywords.some(keyword => lower.includes(keyword));
+};
+
+const getDisruptionRiskAssessment = (policy: string, metrics: PolicyMetrics): { riskLevel: "critical" | "high" | "medium" | "low"; reasons: string[] } => {
+  const risks: string[] = [];
+  let riskLevel: "critical" | "high" | "medium" | "low" = "low";
+
+  if (isControversialPolicy(policy)) {
+    riskLevel = "critical";
+    risks.push("Contains controversial language that can trigger communal violence or riots.");
+  }
+
+  if (metrics.sentiment_score < 30) {
+    if (riskLevel === "low") riskLevel = "high";
+    risks.push("Extremely negative public sentiment—high risk of mass protest and social unrest.");
+  } else if (metrics.sentiment_score < 50) {
+    if (riskLevel === "low") riskLevel = "medium";
+    risks.push("Low public sentiment—may trigger resistance and community backlash.");
+  }
+
+  if (metrics.employment_change < -5) {
+    if (riskLevel === "low") riskLevel = "medium";
+    risks.push("Severe job losses could spark labor strikes and economic disruption.");
+  }
+
+  if (metrics.inflation_impact > 3) {
+    if (riskLevel === "low") riskLevel = "medium";
+    risks.push("High inflation may cause public anger over cost-of-living increases.");
+  }
+
+  return { riskLevel, reasons: risks.length > 0 ? risks : ["Policy appears stable with manageable implementation risk."] };
+};
+
 type InnovationBlock = {
   original: string;
   upgrade: string;
   benefit: string;
 };
 
-const getInnovationBlocks = (text: string): InnovationBlock[] => {
-  const lines = sanitizeText(text)
+const getDynamicBenefitText = (upgrade: string, metrics: PolicyMetrics): string => {
+  const normalized = normalizeDisplayText(upgrade).toLowerCase();
+  const reasons: string[] = [];
+
+  if (/(target|eligib|focus|segment|prioriti)/.test(normalized)) {
+    reasons.push("Improves targeting so benefits reach the intended group.");
+  }
+  if (/(monitor|track|audit|review|dashboard|compliance|verification)/.test(normalized)) {
+    reasons.push("Adds accountability through measurable tracking and verification.");
+  }
+  if (/(digital|online|portal|platform|data|ai|automation)/.test(normalized)) {
+    reasons.push("Improves delivery speed and reduces manual leakage.");
+  }
+  if (/(local|district|state|community|panchayat|municipal|decentral)/.test(normalized)) {
+    reasons.push("Strengthens local implementation and adoption.");
+  }
+
+  if (metrics.sentiment_score >= 65) {
+    reasons.push("Supports stronger public trust and acceptance.");
+  }
+  if (metrics.gdp_growth >= 1) {
+    reasons.push("Improves macroeconomic upside versus the baseline.");
+  }
+  if (metrics.inflation_impact <= 0.5) {
+    reasons.push("Helps keep inflation pressure under control.");
+  }
+
+  if (reasons.length > 0) {
+    return reasons.slice(0, 2).join(" ");
+  }
+
+  return "Provides a clearer execution path with better outcomes than the baseline policy.";
+};
+
+const getSafeguardRecommendations = (improvedPolicy: string, originalPolicy: string, metrics: PolicyMetrics): { safeguards: string[]; exclusions: string[]; hasResidualRisk: boolean } => {
+  const safeguards: string[] = [];
+  const exclusions: string[] = [];
+  let hasResidualRisk = false;
+
+  // If original policy is controversial, add specific exclusions for improved version
+  if (isControversialPolicy(originalPolicy)) {
+    hasResidualRisk = isControversialPolicy(improvedPolicy);
+    
+    if (!hasResidualRisk) {
+      exclusions.push("DO NOT revert to targeting, discriminating, or removing any religious/ethnic group.");
+      exclusions.push("DO NOT include any language about communal segregation or majoritarian policies.");
+      exclusions.push("DO NOT allow implementation without external oversight from minority rights bodies.");
+    } else {
+      exclusions.push("The improved policy STILL contains contentious language—seek legal review before implementation.");
+      safeguards.push("Mandate third-party audit by constitutional experts before rollout.");
+    }
+  }
+
+  // Safeguards based on metrics
+  if (metrics.sentiment_score < 50) {
+    safeguards.push("Conduct broad stakeholder consultation and public awareness campaigns before launch.");
+    if (!exclusions.includes("Ensure transparent cost-benefit analysis is published publicly.")) {
+      safeguards.push("Ensure transparent cost-benefit analysis is published publicly.");
+    }
+  }
+
+  if (metrics.employment_change < -2) {
+    exclusions.push("DO NOT implement without a parallel job retraining and transition support program.");
+    safeguards.push("Package with labor market adjustment schemes to protect workers.");
+  }
+
+  if (metrics.inflation_impact > 2) {
+    exclusions.push("DO NOT phase out existing support schemes simultaneously—stagger implementation.");
+    safeguards.push("Monitor inflation weekly and adjust implementation pace to prevent price shocks.");
+  }
+
+  if (metrics.gdp_growth < 0.5) {
+    safeguards.push("Build in performance review at 6-month and 12-month milestones; adjust if targets aren't met.");
+    exclusions.push("DO NOT commit to multi-year implementation without interim performance gates.");
+  }
+
+  if (metrics.sentiment_score >= 75 && metrics.gdp_growth >= 2) {
+    safeguards.push("This policy has strong public and economic support—fast-track implementation is viable.");
+  }
+
+  // Remove duplicates
+  const uniqueSafeguards = Array.from(new Set(safeguards));
+  const uniqueExclusions = Array.from(new Set(exclusions));
+
+  return {
+    safeguards: uniqueSafeguards.slice(0, 3),
+    exclusions: uniqueExclusions.slice(0, 3),
+    hasResidualRisk,
+  };
+};
+
+const getInnovationBlocks = (originalText: string, improvedText: string, metrics: PolicyMetrics): InnovationBlock[] => {
+  const lines = sanitizeText(improvedText)
     .split(/\n+/)
     .map((line) => line.replace(/^\s*[-*#>\d.)]+\s*/, "").trim())
     .filter((line) => line.length > 25);
@@ -173,16 +308,33 @@ const getInnovationBlocks = (text: string): InnovationBlock[] => {
     blocks.push(current);
   }
 
-  if (blocks.length > 0) {
-    return blocks.slice(0, 3);
+  const parsed = blocks
+    .map((block) => ({
+      original: block.original,
+      upgrade: block.upgrade,
+      benefit: block.benefit || getDynamicBenefitText(block.upgrade, metrics),
+    }))
+    .filter((block) => block.upgrade.length > 0)
+    .slice(0, 3);
+
+  if (parsed.length > 0) {
+    return parsed;
   }
 
-  const fallbackPoints = toPolicyPoints(text).slice(0, 3);
-  return fallbackPoints.map((point, index) => ({
-    original: index === 0 ? "Policy baseline" : "Existing gap",
-    upgrade: normalizeDisplayText(point),
-    benefit: "Direct improvement to policy execution and outcomes.",
-  }));
+  const originalPoints = toPolicyPoints(originalText);
+  const improvedPoints = toPolicyPoints(improvedText);
+  const maxCount = Math.max(1, Math.min(3, Math.max(originalPoints.length, improvedPoints.length)));
+
+  return Array.from({ length: maxCount }).map((_, index) => {
+    const sourceOriginal = originalPoints[index] || originalPoints[0] || normalizeDisplayText(toSimplePolicySummary(originalText));
+    const sourceUpgrade = improvedPoints[index] || improvedPoints[0] || normalizeDisplayText(toSimplePolicySummary(improvedText));
+
+    return {
+      original: normalizeDisplayText(sourceOriginal),
+      upgrade: normalizeDisplayText(sourceUpgrade),
+      benefit: getDynamicBenefitText(sourceUpgrade, metrics),
+    };
+  });
 };
 
 const getOriginalCons = (metrics: PolicyMetrics): string[] => {
@@ -417,11 +569,25 @@ const ComparePage = () => {
     metrics: PolicyMetrics,
     label: string,
     isRecommended: boolean
-  ) => (
+  ) => {
+    const disruption = getDisruptionRiskAssessment(policy, metrics);
+    const riskBgColors = {
+      critical: "bg-red-950/30 border-red-500/30",
+      high: "bg-orange-950/30 border-orange-500/30",
+      medium: "bg-amber-950/30 border-amber-500/30",
+      low: "bg-green-950/30 border-green-500/30",
+    };
+
+    return (
     <GlowCard hoverable={false} className="relative p-10">
       {isRecommended && (
         <div className="absolute -top-3 left-10 flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-display font-bold uppercase tracking-[0.2em] bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.3)]">
           <Award className="w-3 h-3" /> Recommended
+        </div>
+      )}
+      {!isRecommended && disruption.riskLevel !== "low" && (
+        <div className="absolute -top-3 right-10 flex items-center gap-1 px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest border border-red-500/40 bg-red-950/20">
+          <span className="text-red-400">⚠️ {disruption.riskLevel.toUpperCase()} RISK</span>
         </div>
       )}
       <h3 className="text-xl font-display font-bold text-foreground mb-2 mt-2 tracking-tight">{label}</h3>
@@ -431,7 +597,7 @@ const ComparePage = () => {
         </p>
         {isRecommended ? (
           <div className="space-y-4">
-            {getInnovationBlocks(policy).map((block, idx) => (
+            {getInnovationBlocks(data?.original_policy || "", policy, metrics).map((block, idx) => (
               <div key={`${idx}-${block.original.slice(0, 20)}`} className="rounded-2xl border border-emerald-500/15 bg-emerald-500/5 p-4 space-y-2">
                 <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">Original Gap</div>
                 <p className="text-xs text-muted-foreground leading-relaxed">{renderInnovationText(block.original)}</p>
@@ -441,9 +607,69 @@ const ComparePage = () => {
                 <p className="text-xs text-cyan-200 leading-relaxed">{renderInnovationText(block.benefit)}</p>
               </div>
             ))}
+            
+            {(() => {
+              const safeguards = getSafeguardRecommendations(policy, data?.original_policy || "", metrics);
+              return (
+                <div className="space-y-3 mt-4 pt-4 border-t border-emerald-500/20">
+                  {safeguards.hasResidualRisk && (
+                    <div className="rounded-lg border border-orange-500/40 bg-orange-950/20 p-3">
+                      <p className="text-xs font-semibold text-orange-300 flex items-center gap-2">
+                        <AlertTriangle className="w-3 h-3" />
+                        Residual Risk Warning
+                      </p>
+                      <p className="text-[11px] text-orange-200 mt-1">This improved policy still retains contentious elements. External legal/constitutional review is mandatory before implementation.</p>
+                    </div>
+                  )}
+                  
+                  {safeguards.exclusions.length > 0 && (
+                    <div className="rounded-lg border border-red-500/30 bg-red-950/15 p-3">
+                      <p className="text-[9px] font-bold text-red-300 uppercase tracking-wider mb-2">🚫 Do NOT Implement</p>
+                      <ul className="space-y-1">
+                        {safeguards.exclusions.map((exclusion, idx) => (
+                          <li key={idx} className="text-[10px] text-red-200 leading-snug flex gap-1">
+                            <span className="flex-shrink-0">•</span>
+                            <span>{exclusion}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {safeguards.safeguards.length > 0 && (
+                    <div className="rounded-lg border border-blue-500/30 bg-blue-950/15 p-3">
+                      <p className="text-[9px] font-bold text-blue-300 uppercase tracking-wider mb-2">✓ Implementation Safeguards</p>
+                      <ul className="space-y-1">
+                        {safeguards.safeguards.map((safeguard, idx) => (
+                          <li key={idx} className="text-[10px] text-blue-200 leading-snug flex gap-1">
+                            <span className="flex-shrink-0">→</span>
+                            <span>{safeguard}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-4">{normalizeDisplayText(toSimplePolicySummary(policy))}</p>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground leading-relaxed">{normalizeDisplayText(toSimplePolicySummary(policy))}</p>
+            {disruption.riskLevel !== "low" && (
+              <div className={`rounded-lg border p-3 ${riskBgColors[disruption.riskLevel]}`}>
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-400" />
+                  <div className="text-xs space-y-1">
+                    <p className="font-semibold text-white">Disruption Risk Alert</p>
+                    {disruption.reasons.map((reason, idx) => (
+                      <p key={idx} className="text-muted-foreground leading-relaxed">{reason}</p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
       
@@ -473,7 +699,8 @@ const ComparePage = () => {
         ))}
       </div>
     </GlowCard>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -514,6 +741,8 @@ const ComparePage = () => {
 
   const improvedPolicyPoints = toPolicyPoints(data.improved_policy);
   const originalPolicyCons = getOriginalCons(data.original_metrics);
+  const originalPolicyDisruption = getDisruptionRiskAssessment(data.original_policy, data.original_metrics);
+  const hideImprovedPolicy = originalPolicyDisruption.riskLevel !== "low";
 
   const improvementChartData = [
     { name: "GDP", value: Number(data.improvements.gdp_improvement.toFixed(2)) },
@@ -559,11 +788,28 @@ const ComparePage = () => {
           "Original Policy",
           false
         )}
-        {renderPolicyCard(
-          data.improved_policy,
-          data.improved_metrics,
-          "Improved Policy",
-          true
+        {hideImprovedPolicy ? (
+          <GlowCard hoverable={false} className="p-10 border-red-500/30 bg-red-950/10">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-red-300 mb-4 font-bold">Improved Policy Hidden</p>
+            <div className="rounded-lg border border-red-500/30 bg-red-950/20 p-4">
+              <p className="text-sm text-red-200 font-semibold mb-2">Conflict Risk Detected</p>
+              <p className="text-xs text-red-100 leading-relaxed mb-3">
+                This policy may cause social conflict or unrest. Improved policy suggestions are intentionally withheld for safety.
+              </p>
+              <div className="space-y-1">
+                {originalPolicyDisruption.reasons.slice(0, 3).map((reason, idx) => (
+                  <p key={idx} className="text-xs text-red-200 leading-relaxed">{idx + 1}. {reason}</p>
+                ))}
+              </div>
+            </div>
+          </GlowCard>
+        ) : (
+          renderPolicyCard(
+            data.improved_policy,
+            data.improved_metrics,
+            "Improved Policy",
+            true
+          )
         )}
       </div>
 
@@ -583,18 +829,20 @@ const ComparePage = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-        <GlowCard hoverable={false} className="p-8 bg-secondary/10 border-emerald-500/30">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-400 mb-5 font-bold">Improved Policy In Clear Points</p>
-          <ul className="space-y-3">
-            {improvedPolicyPoints.map((point, index) => (
-              <li key={`${index}-${point.slice(0, 20)}`} className="text-sm text-emerald-100 leading-relaxed">
-                {index + 1}. {point}
-              </li>
-            ))}
-          </ul>
-        </GlowCard>
+        {!hideImprovedPolicy && (
+          <GlowCard hoverable={false} className="p-8 bg-secondary/10 border-emerald-500/30">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-400 mb-5 font-bold">Improved Policy In Clear Points</p>
+            <ul className="space-y-3">
+              {improvedPolicyPoints.map((point, index) => (
+                <li key={`${index}-${point.slice(0, 20)}`} className="text-sm text-emerald-100 leading-relaxed">
+                  {index + 1}. {point}
+                </li>
+              ))}
+            </ul>
+          </GlowCard>
+        )}
 
-        <GlowCard hoverable={false} className="p-8 bg-secondary/10 border-rose-500/30">
+        <GlowCard hoverable={false} className={`p-8 bg-secondary/10 border-rose-500/30 ${hideImprovedPolicy ? "md:col-span-2" : ""}`}>
           <p className="text-[10px] uppercase tracking-[0.2em] text-rose-400 mb-5 font-bold">Cons Of Original Policy</p>
           <ul className="space-y-3">
             {originalPolicyCons.map((item, index) => (
@@ -606,56 +854,58 @@ const ComparePage = () => {
         </GlowCard>
       </div>
 
-      <GlowCard hoverable={false} className="p-10 mb-12 bg-secondary/10 border-border/20">
-        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-8 font-bold">Dynamic Graphs For Improved Policy</p>
+      {!hideImprovedPolicy && (
+        <GlowCard hoverable={false} className="p-10 mb-12 bg-secondary/10 border-border/20">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-8 font-bold">Dynamic Graphs For Improved Policy</p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="h-[280px]">
-            <p className="text-xs text-muted-foreground mb-4">Improvement by metric</p>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={improvementChartData}>
-                <CartesianGrid strokeDasharray="4 4" stroke="#2A2A31" />
-                <XAxis dataKey="name" stroke="#8E8E99" fontSize={11} />
-                <YAxis stroke="#8E8E99" fontSize={11} />
-                <Tooltip
-                  contentStyle={{
-                    background: "#151517",
-                    border: "1px solid #2A2A31",
-                    borderRadius: "10px",
-                    color: "#FFFFFF",
-                    fontSize: 12,
-                  }}
-                  formatter={(value) => [`${value}%`, "Improvement"]}
-                />
-                <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#10b981" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="h-[280px]">
+              <p className="text-xs text-muted-foreground mb-4">Improvement by metric</p>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={improvementChartData}>
+                  <CartesianGrid strokeDasharray="4 4" stroke="#2A2A31" />
+                  <XAxis dataKey="name" stroke="#8E8E99" fontSize={11} />
+                  <YAxis stroke="#8E8E99" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#151517",
+                      border: "1px solid #2A2A31",
+                      borderRadius: "10px",
+                      color: "#FFFFFF",
+                      fontSize: 12,
+                    }}
+                    formatter={(value) => [`${value}%`, "Improvement"]}
+                  />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#10b981" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
 
-          <div className="h-[280px]">
-            <p className="text-xs text-muted-foreground mb-4">Original vs improved trend</p>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={dynamicComparisonData}>
-                <CartesianGrid strokeDasharray="4 4" stroke="#2A2A31" />
-                <XAxis dataKey="stage" stroke="#8E8E99" fontSize={11} />
-                <YAxis stroke="#8E8E99" fontSize={11} />
-                <Tooltip
-                  contentStyle={{
-                    background: "#151517",
-                    border: "1px solid #2A2A31",
-                    borderRadius: "10px",
-                    color: "#FFFFFF",
-                    fontSize: 12,
-                  }}
-                />
-                <Line type="monotone" dataKey="gdp" stroke="#34d399" strokeWidth={2} dot={{ r: 4 }} name="GDP" />
-                <Line type="monotone" dataKey="employment" stroke="#60a5fa" strokeWidth={2} dot={{ r: 4 }} name="Employment" />
-                <Line type="monotone" dataKey="sentiment" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} name="Sentiment" />
-              </LineChart>
-            </ResponsiveContainer>
+            <div className="h-[280px]">
+              <p className="text-xs text-muted-foreground mb-4">Original vs improved trend</p>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={dynamicComparisonData}>
+                  <CartesianGrid strokeDasharray="4 4" stroke="#2A2A31" />
+                  <XAxis dataKey="stage" stroke="#8E8E99" fontSize={11} />
+                  <YAxis stroke="#8E8E99" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#151517",
+                      border: "1px solid #2A2A31",
+                      borderRadius: "10px",
+                      color: "#FFFFFF",
+                      fontSize: 12,
+                    }}
+                  />
+                  <Line type="monotone" dataKey="gdp" stroke="#34d399" strokeWidth={2} dot={{ r: 4 }} name="GDP" />
+                  <Line type="monotone" dataKey="employment" stroke="#60a5fa" strokeWidth={2} dot={{ r: 4 }} name="Employment" />
+                  <Line type="monotone" dataKey="sentiment" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} name="Sentiment" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
-      </GlowCard>
+        </GlowCard>
+      )}
 
       {/* Benefits Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -673,19 +923,21 @@ const ComparePage = () => {
           </div>
         </GlowCard>
 
-        <GlowCard hoverable={false} className="p-10 bg-secondary/10 border-emerald-500/30">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-400 mb-6 font-bold">✨ Improved Policy Benefits</p>
-          <div className="space-y-4">
-            <div>
-              <p className="text-[9px] text-muted-foreground uppercase mb-2">Economic Impact</p>
-              <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.improved_metrics.economic_impact).slice(0, 150)}...</p>
+        {!hideImprovedPolicy && (
+          <GlowCard hoverable={false} className="p-10 bg-secondary/10 border-emerald-500/30">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-400 mb-6 font-bold">✨ Improved Policy Benefits</p>
+            <div className="space-y-4">
+              <div>
+                <p className="text-[9px] text-muted-foreground uppercase mb-2">Economic Impact</p>
+                <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.improved_metrics.economic_impact).slice(0, 150)}...</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-muted-foreground uppercase mb-2">Social Impact</p>
+                <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.improved_metrics.social_impact).slice(0, 150)}...</p>
+              </div>
             </div>
-            <div>
-              <p className="text-[9px] text-muted-foreground uppercase mb-2">Social Impact</p>
-              <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.improved_metrics.social_impact).slice(0, 150)}...</p>
-            </div>
-          </div>
-        </GlowCard>
+          </GlowCard>
+        )}
       </div>
     </div>
   );
