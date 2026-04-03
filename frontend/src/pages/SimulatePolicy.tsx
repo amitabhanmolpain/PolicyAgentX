@@ -6,7 +6,7 @@ import ChatInput from "@/components/ChatInput";
 import { simulatePolicy, SimulationResult } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, AlertTriangle } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -62,11 +62,79 @@ const SimulatePolicyPage = () => {
   const [showResults, setShowResults] = useState(false);
   const [showIndiaWarning, setShowIndiaWarning] = useState(false);
   const [hasControversialPolicy, setHasControversialPolicy] = useState(false);
+  const [emergencyAlertActive, setEmergencyAlertActive] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
 
   const resultsRef = useRef<HTMLDivElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sirenOscRef = useRef<OscillatorNode | null>(null);
+  const sirenLfoRef = useRef<OscillatorNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
   const [apiResults, setApiResults] = useState<SimulationResult | null>(null);
   const { toast } = useToast();
+
+  const stopEmergencyAlarm = () => {
+    try {
+      sirenLfoRef.current?.stop();
+      sirenOscRef.current?.stop();
+    } catch {
+      // Ignore stop errors from already-stopped oscillators.
+    }
+
+    try {
+      sirenLfoRef.current?.disconnect();
+      sirenOscRef.current?.disconnect();
+      gainNodeRef.current?.disconnect();
+    } catch {
+      // Ignore disconnect errors during teardown.
+    }
+
+    sirenLfoRef.current = null;
+    sirenOscRef.current = null;
+    gainNodeRef.current = null;
+  };
+
+  const startEmergencyAlarm = async () => {
+    try {
+      if (!audioContextRef.current) {
+        const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AudioCtx) return;
+        audioContextRef.current = new AudioCtx();
+      }
+
+      const audioContext = audioContextRef.current;
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+
+      stopEmergencyAlarm();
+
+      const sirenOsc = audioContext.createOscillator();
+      const sirenLfo = audioContext.createOscillator();
+      const sirenGain = audioContext.createGain();
+
+      sirenOsc.type = "sawtooth";
+      sirenOsc.frequency.value = 760;
+
+      sirenLfo.type = "sine";
+      sirenLfo.frequency.value = 1.75;
+
+      sirenGain.gain.value = 0.07;
+
+      sirenLfo.connect(sirenOsc.frequency);
+      sirenOsc.connect(sirenGain);
+      sirenGain.connect(audioContext.destination);
+
+      sirenOsc.start();
+      sirenLfo.start();
+
+      sirenOscRef.current = sirenOsc;
+      sirenLfoRef.current = sirenLfo;
+      gainNodeRef.current = sirenGain;
+    } catch (error) {
+      console.error("Unable to start emergency alarm:", error);
+    }
+  };
 
   // Load messages and results from localStorage on mount
   useEffect(() => {
@@ -144,6 +212,18 @@ const SimulatePolicyPage = () => {
     localStorage.setItem("policySimulationControversial", JSON.stringify(hasControversialPolicy));
   }, [hasControversialPolicy]);
 
+  useEffect(() => {
+    return () => {
+      stopEmergencyAlarm();
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        audioContextRef.current.close().catch(() => {
+          // Ignore close errors during unmount.
+        });
+      }
+      audioContextRef.current = null;
+    };
+  }, []);
+
   const handleNewChat = () => {
     localStorage.removeItem("policySimulationChat");
     localStorage.removeItem("policySimulationResults");
@@ -162,6 +242,13 @@ const SimulatePolicyPage = () => {
     setShowResults(false);
     setApiResults(null);
     setHasControversialPolicy(false);
+    setEmergencyAlertActive(false);
+    stopEmergencyAlarm();
+  };
+
+  const handleEmergencyConfirmation = () => {
+    setEmergencyAlertActive(false);
+    stopEmergencyAlarm();
   };
 
   const detectControversialPolicy = (text: string): boolean => {
@@ -196,6 +283,17 @@ const SimulatePolicyPage = () => {
 // Check for controversial policy
     const isControversial = detectControversialPolicy(content);
     setHasControversialPolicy(isControversial);
+    if (isControversial) {
+      setEmergencyAlertActive(true);
+      startEmergencyAlarm();
+
+      const alertMsg: Message = {
+        id: `emergency-${Date.now()}`,
+        role: "assistant",
+        content: "🚨 EMERGENCY ALERT: This policy appears highly sensitive and can potentially trigger social unrest or riots. Confirm understanding before proceeding."
+      };
+      setMessages(prev => prev.concat([alertMsg]));
+    }
 
     // Check if policy is explicitly for NON-India countries (default to India)
     const nonIndiaKeywords = [
@@ -406,6 +504,88 @@ const SimulatePolicyPage = () => {
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-64px)] w-full bg-background relative">
+      <AnimatePresence>
+        {emergencyAlertActive && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[220] overflow-hidden"
+          >
+            <motion.div
+              aria-hidden="true"
+              className="absolute inset-0 bg-black"
+              animate={{ opacity: [0.9, 0.35, 0.85, 0.25, 0.9] }}
+              transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
+            />
+
+            <motion.div
+              aria-hidden="true"
+              className="absolute inset-0"
+              style={{
+                backgroundImage: "repeating-linear-gradient(0deg, rgba(255,0,0,0.2) 0px, rgba(255,0,0,0.2) 1px, transparent 1px, transparent 4px)"
+              }}
+              animate={{ opacity: [0.12, 0.45, 0.15, 0.52, 0.12] }}
+              transition={{ duration: 0.4, repeat: Infinity, ease: "linear" }}
+            />
+
+            <motion.div
+              aria-hidden="true"
+              className="absolute inset-0"
+              style={{
+                background: "radial-gradient(circle at center, rgba(255,28,28,0.42), rgba(35,0,0,0.85) 55%, rgba(0,0,0,0.98) 100%)"
+              }}
+              animate={{ opacity: [0.35, 0.9, 0.4, 1, 0.35] }}
+              transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+            />
+
+            <div className="relative z-10 h-full flex items-center justify-center px-4">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.35 }}
+                className="w-full max-w-2xl border-2 border-red-500/80 bg-black/75 backdrop-blur-md p-6 md:p-8 shadow-[0_0_50px_rgba(255,0,0,0.6)]"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1], rotate: [0, -6, 6, 0] }}
+                    transition={{ duration: 0.65, repeat: Infinity }}
+                  >
+                    <AlertTriangle className="w-8 h-8 text-red-400" />
+                  </motion.div>
+                  <div>
+                    <p className="text-red-400 text-xs md:text-sm font-bold tracking-[0.28em] uppercase">Threat Condition Crimson</p>
+                    <p className="text-red-200 text-lg md:text-2xl font-black tracking-[0.08em] uppercase">Civil Unrest Risk Detected</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 border border-red-500/50 bg-red-950/20 p-4 md:p-5">
+                  <p className="text-red-100 text-sm md:text-base leading-relaxed">
+                    The submitted policy content contains high-risk language that may escalate communal conflict and trigger riot conditions.
+                  </p>
+                  <p className="text-red-200/90 text-xs md:text-sm uppercase tracking-[0.12em]">
+                    Emergency protocol requires explicit acknowledgement before alarm shutdown.
+                  </p>
+                </div>
+
+                <div className="mt-5 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                  <p className="text-red-300 text-xs uppercase tracking-[0.14em]">
+                    Alarm status: active
+                  </p>
+                  <Button
+                    type="button"
+                    onClick={handleEmergencyConfirmation}
+                    className="h-11 px-6 text-xs md:text-sm font-extrabold uppercase tracking-[0.12em] bg-red-500 hover:bg-red-400 text-black border border-red-300"
+                  >
+                    I confirm understanding this policy can cause riots
+                  </Button>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Controversial Policy Alert */}
       <AnimatePresence>
         {hasControversialPolicy && (
