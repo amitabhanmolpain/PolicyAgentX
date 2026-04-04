@@ -61,12 +61,34 @@ class RAGAgentOrchestrator:
         # Step 1: RAG Context Retrieval
         print("📚 Step 1: Retrieving RAG Context...")
         if not self.rag_retriever:
-            rag_context = {"error": "RAG not available"}
+            rag_context = {
+                "error": "RAG not available",
+                "detected_type": self._detect_policy_type(policy_description),
+                "financial_context": "",
+                "demographic_context": "",
+                "economic_context": "",
+                "government_context": "",
+            }
         else:
             try:
-                rag_context = self.rag_retriever.enhance_policy_with_context(policy_description)
+                context_text = self.rag_retriever.enhance_policy_with_context(policy_description)
+                rag_context = {
+                    "detected_type": self._detect_policy_type(policy_description),
+                    "enhanced_context": context_text,
+                    "financial_context": context_text,
+                    "demographic_context": context_text,
+                    "economic_context": context_text,
+                    "government_context": context_text,
+                }
             except Exception as e:
-                rag_context = {"error": f"RAG retrieval failed: {e}"}
+                rag_context = {
+                    "error": f"RAG retrieval failed: {e}",
+                    "detected_type": self._detect_policy_type(policy_description),
+                    "financial_context": "",
+                    "demographic_context": "",
+                    "economic_context": "",
+                    "government_context": "",
+                }
         
         # Initialize agent context
         agent_context = AgentContext(
@@ -124,18 +146,18 @@ class RAGAgentOrchestrator:
             
             # Predict financial impact
             impact = self.predictor.predict_financial_impact(
-                policy_description=context.policy_description,
-                historical_context=financial_data.get("context", [])
+                policy_text=context.policy_description,
+                historical_context=financial_data.get("context", "")
             )
             
             return {
                 "status": "✓ Complete",
-                "net_impact": impact.get("net_impact_crores"),
-                "estimated_revenue": impact.get("estimated_revenue_crores"),
-                "estimated_cost": impact.get("estimated_cost_crores"),
-                "per_capita_impact": impact.get("per_capita_impact"),
-                "confidence": impact.get("confidence"),
-                "assumptions": impact.get("assumptions", [])
+                "net_impact": impact.net_impact,
+                "estimated_revenue": impact.estimated_revenue_crores,
+                "estimated_cost": impact.implementation_cost,
+                "per_capita_impact": impact.revenue_per_capita,
+                "confidence": impact.confidence_level,
+                "assumptions": impact.assumptions
             }
         except Exception as e:
             return {"error": f"Financial analysis failed: {e}"}
@@ -147,29 +169,32 @@ class RAGAgentOrchestrator:
             return {"error": "Predictor not available"}
         
         try:
-            # Predict demographic impact
-            impact = self.predictor.predict_demographic_impact(
-                policy_description=context.policy_description,
-                demographic_context=context.rag_context.get("demographic_context", [])
-            )
-            
-            # Format demographic breakdown
+            # Predict demographic impact by income class
             demographic_breakdown = []
-            for income_class, data in impact.items():
-                if income_class != "assumptions":
-                    demographic_breakdown.append({
-                        "income_class": income_class,
-                        "beneficiaries": data.get("beneficiaries_percent"),
-                        "sufferers": data.get("sufferers_percent"),
-                        "net_impact_per_person": data.get("net_benefit_per_person"),
-                        "total_affected": data.get("total_affected")
-                    })
+            main_beneficiaries = []
+            main_sufferers = []
+            for income_class in ["upper", "middle", "lower_middle", "bpl"]:
+                impact = self.predictor.predict_demographic_impact(
+                    policy_text=context.policy_description,
+                    income_class=income_class,
+                )
+                demographic_breakdown.append({
+                    "income_class": impact.income_class,
+                    "beneficiaries": impact.beneficiaries_percent,
+                    "sufferers": impact.sufferers_percent,
+                    "net_impact_per_person": impact.net_benefit_per_person,
+                    "total_affected": impact.population_affected,
+                })
+                if impact.beneficiaries_percent > impact.sufferers_percent:
+                    main_beneficiaries.append(impact.income_class)
+                elif impact.sufferers_percent > impact.beneficiaries_percent:
+                    main_sufferers.append(impact.income_class)
             
             return {
                 "status": "✓ Complete",
                 "breakdown": demographic_breakdown,
-                "main_beneficiaries": impact.get("main_beneficiaries", []),
-                "main_sufferers": impact.get("main_sufferers", [])
+                "main_beneficiaries": main_beneficiaries,
+                "main_sufferers": main_sufferers,
             }
         except Exception as e:
             return {"error": f"Demographic analysis failed: {e}"}
@@ -209,26 +234,33 @@ class RAGAgentOrchestrator:
         try:
             # Predict economic impact over 5 years
             impact = self.predictor.project_future_impact(
-                policy_description=context.policy_description,
-                economic_baseline=context.rag_context.get("economic_context", [])
+                policy_text=context.policy_description,
+                years=5,
             )
             
             # Format projections
             projections = []
-            for year, data in impact.items():
-                if year != "assumptions":
-                    projections.append({
-                        "year": year,
-                        "gdp_impact": data.get("gdp_impact"),
-                        "employment_change": data.get("employment_change"),
-                        "inflation_impact": data.get("inflation_impact"),
-                        "tax_revenue": data.get("tax_revenue_impact")
-                    })
+            for projection in impact:
+                projections.append({
+                    "year": projection.year,
+                    "gdp_impact": projection.gdp_impact_percent,
+                    "employment_change": projection.employment_jobs_gained,
+                    "inflation_impact": projection.inflation_impact,
+                    "tax_revenue": projection.tax_revenue_impact_crores,
+                })
+
+            avg_gdp_impact = sum(p["gdp_impact"] for p in projections) / len(projections) if projections else 0.0
+            if avg_gdp_impact > 0.5:
+                long_term_outlook = "Positive"
+            elif avg_gdp_impact < -0.5:
+                long_term_outlook = "Negative"
+            else:
+                long_term_outlook = "Stable"
             
             return {
                 "status": "✓ Complete",
                 "5_year_projections": projections,
-                "long_term_outlook": impact.get("long_term_outlook", "Stable")
+                "long_term_outlook": long_term_outlook,
             }
         except Exception as e:
             return {"error": f"Economic analysis failed: {e}"}
@@ -311,7 +343,7 @@ class RAGAgentOrchestrator:
             "policy_summary": {
                 "description": context.policy_description,
                 "type": context.policy_type,
-                "rag_context_confidence": len(context.rag_context.get("financial_context", [])) > 0
+                "rag_context_confidence": bool(context.rag_context.get("financial_context", "").strip())
             },
             "financial_impact": context.financial_analysis,
             "demographic_impact": context.demographic_analysis,
@@ -319,8 +351,8 @@ class RAGAgentOrchestrator:
             "economic_outlook": context.economic_impact,
             "business_implications": context.business_impact,
             "risk_assessment": {
-                "identified_risks": context.risk_factors,
-                "overall_risk_level": "Low" if len([r for r in context.risk_factors if "Error" not in r]) < 3 else "Medium"
+                "identified_risks": context.risk_factors or [],
+                "overall_risk_level": "Low" if len([r for r in (context.risk_factors or []) if "Error" not in r]) < 3 else "Medium"
             },
             "government_coordination": context.government_coordination,
             "execution_summary": self._generate_execution_summary(context)
@@ -343,6 +375,25 @@ class RAGAgentOrchestrator:
         """
         
         return summary.strip()
+
+    def _detect_policy_type(self, policy_text: str) -> str:
+        """Detect high-level policy category from input text."""
+        keywords = {
+            "tax": "taxation",
+            "income": "income_tax",
+            "gst": "gst",
+            "education": "education",
+            "health": "healthcare",
+            "welfare": "social_welfare",
+            "employment": "employment",
+            "environment": "environmental",
+            "agriculture": "agricultural",
+        }
+        policy_lower = policy_text.lower()
+        for keyword, policy_type in keywords.items():
+            if keyword in policy_lower:
+                return policy_type
+        return "general"
     
     # ============ Helper Methods ============
     

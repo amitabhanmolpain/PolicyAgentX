@@ -13,6 +13,9 @@ def risk_agent(state: dict) -> dict:
     """
     policy_text = state.get("policy_text", "")
     region = state.get("region", "India")
+    rag_context = state.get("rag_context", "")[:2000]
+    historical_cases = state.get("historical_protest_cases", [])
+    baseline_score = int(state.get("protest_risk_score", 5) or 5)
     
     prompt = f"""⚠️ CRITICAL: This analysis is STRICTLY FOR INDIAN GOVERNMENT POLICIES ONLY.
 
@@ -20,6 +23,12 @@ You are a political risk analyst specializing exclusively in Indian public senti
 
 Policy: {policy_text}
 Analysis Region: India (NOT any other country - analyze ONLY Indian context)
+
+Historical Protest Context from RAG:
+{rag_context}
+
+Historical Protest Cases:
+{historical_cases}
 
 Conduct a PROTEST RISK ANALYSIS for India. Assess the likelihood of public protests and civil unrest SPECIFICALLY in the Indian context:
 
@@ -48,19 +57,25 @@ Conduct a PROTEST RISK ANALYSIS for India. Assess the likelihood of public prote
 
 4. **Confidence Score**: How confident are you in this assessment for India? (70-95% confidence based on Indian political precedent)
 
+5. **Protest Risk Score (1-10)**:
+    - Use 1 for very low protest risk and 10 for extreme protest risk.
+    - Baseline from retrieval heuristic: {baseline_score}
+
 Be extremely specific with examples from INDIAN history ONLY. Extract only Indian precedents.
 
 Format your response as:
 PROTEST_LIKELIHOOD: [LOW/MEDIUM/HIGH with Indian context and percentage]
 AFFECTED_GROUPS: [specific Indian groups, percentages, affected Indian states]
 PUBLIC_REACTION: [emotional triggers for Indians, Indian historical parallels, Indian media narrative]
-CONFIDENCE_SCORE: [percentage confidence in Indian context]"""
+CONFIDENCE_SCORE: [percentage confidence in Indian context]
+PROTEST_RISK_SCORE: [integer 1-10]"""
 
     response = response_text(generate(prompt, temperature=0.8, max_tokens=2500))
     
     result = {
         "risk_analysis": response,
         "protest_likelihood": _extract_protest_level(response),
+        "protest_risk_score": _extract_risk_score(response, baseline_score),
         "affected_groups": _extract_section(response, "AFFECTED_GROUPS"),
         "public_reaction": _extract_section(response, "PUBLIC_REACTION"),
         "confidence_score": _extract_confidence(response),
@@ -104,6 +119,25 @@ def _extract_confidence(text: str) -> str:
         return text[start:end].strip()
     except:
         return "75%"
+
+
+def _extract_risk_score(text: str, fallback: int) -> int:
+    """Extract numeric protest risk score from model response."""
+    try:
+        start = text.find("PROTEST_RISK_SCORE:")
+        if start == -1:
+            return max(1, min(10, fallback))
+        start += len("PROTEST_RISK_SCORE:") + 1
+        end = text.find("\n", start)
+        if end == -1:
+            end = len(text)
+        raw = text[start:end].strip()
+        digits = "".join(ch for ch in raw if ch.isdigit())
+        if not digits:
+            return max(1, min(10, fallback))
+        return max(1, min(10, int(digits[:2])))
+    except:
+        return max(1, min(10, fallback))
 
 
 def _extract_section(text: str, section: str) -> str:

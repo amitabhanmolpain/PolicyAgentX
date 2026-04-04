@@ -13,10 +13,14 @@ def economic_agent(state: dict) -> dict:
     """
     policy_text = state.get("policy_text", "")
     region = state.get("region", "India")
+    rag_context = state.get("rag_context", "")[:1400]
     
     prompt = f"""Answer in 8 words MAXIMUM per line. No long answers.
 
 Policy: {policy_text}
+
+Historical Protest Context (India):
+{rag_context}
 
 Answer format:
 GDP_IMPACT:

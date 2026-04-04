@@ -13,6 +13,8 @@ def recommend_policy(state: dict) -> dict:
     """
     policy_text = state.get("policy_text", "")
     region = state.get("region", "India")
+    rag_context = state.get("rag_context", "")[:1800]
+    historical_cases = state.get("historical_protest_cases", [])
     
     prompt = f"""⚠️ IMPORTANT: This analysis is STRICTLY FOR INDIAN GOVERNMENT POLICIES ONLY.
 
@@ -20,6 +22,12 @@ You are a senior policy advisor to the Indian government with expertise exclusiv
 
 Original Policy: {policy_text}
 Analysis Region: India (NOT any other country - provide recommendations ONLY for India)
+
+Historical Protest Context from RAG:
+{rag_context}
+
+Historical Protest Cases:
+{historical_cases}
 
 Based on this policy for India, provide OPTIMIZED RECOMMENDATIONS for Indian government:
 

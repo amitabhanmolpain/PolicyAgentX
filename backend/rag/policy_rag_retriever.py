@@ -5,6 +5,8 @@ Retrieves relevant government data to provide context for policy prediction
 """
 
 from typing import List, Dict, Any, Optional
+from pathlib import Path
+import os
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.documents import Document
@@ -13,28 +15,102 @@ from langchain_core.documents import Document
 class PolicyRAGRetriever:
     """Efficient retrieval of government data for policy analysis"""
     
-    def __init__(self, persist_dir: str = "./chroma_policy_db_enhanced"):
+    def __init__(self, persist_dir: Optional[str] = None, collection_name: Optional[str] = None):
         self.embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2",
             model_kwargs={"device": "cpu"}
         )
         self.persist_dir = persist_dir
+        self.collection_name = collection_name
         self.vectorstore = None
         self._load_vectorstore()
+
+    def _candidate_persist_dirs(self) -> List[Path]:
+        """Return ordered candidate ChromaDB directories."""
+        backend_dir = Path(__file__).resolve().parents[1]
+
+        user_input = [Path(self.persist_dir)] if self.persist_dir else []
+        env_dir = os.getenv("POLICY_RAG_DB_DIR")
+        env_input = [Path(env_dir)] if env_dir else []
+
+        defaults = [
+            backend_dir / "chroma_db" / "protests",
+            backend_dir / "chroma_policy_db_enhanced",
+            backend_dir / "chroma_policy_db",
+        ]
+
+        ordered = user_input + env_input + defaults
+        unique = []
+        seen = set()
+        for path in ordered:
+            key = str(path.resolve()) if path.exists() else str(path)
+            if key not in seen:
+                seen.add(key)
+                unique.append(path)
+        return unique
+
+    def _candidate_collections(self) -> List[str]:
+        """Return ordered candidate Chroma collection names."""
+        env_collection = os.getenv("POLICY_RAG_COLLECTION")
+        candidates = [self.collection_name, env_collection, "langchain", "policy_analysis"]
+        return [name for name in candidates if name]
     
     def _load_vectorstore(self):
-        """Load existing vector store"""
-        try:
-            self.vectorstore = Chroma(
-                persist_directory=self.persist_dir,
-                embedding_function=self.embeddings,
-                collection_name="policy_analysis"
+        """Load existing vector store with automatic fallback discovery."""
+        best_store = None
+        best_count = -1
+        best_dir = None
+        best_collection = None
+
+        for persist_path in self._candidate_persist_dirs():
+            if not persist_path.exists():
+                continue
+
+            for collection in self._candidate_collections():
+                try:
+                    candidate = Chroma(
+                        persist_directory=str(persist_path),
+                        embedding_function=self.embeddings,
+                        collection_name=collection,
+                    )
+
+                    # Prefer the first non-empty collection.
+                    try:
+                        count = candidate._collection.count()
+                    except Exception:
+                        count = 0
+
+                    if count > best_count:
+                        best_store = candidate
+                        best_count = count
+                        best_dir = str(persist_path)
+                        best_collection = collection
+                except Exception:
+                    continue
+
+        if best_store is not None:
+            self.vectorstore = best_store
+            self.persist_dir = best_dir
+            self.collection_name = best_collection
+            print(
+                f"✅ Loaded vector store from {self.persist_dir} "
+                f"(collection={self.collection_name}, docs={best_count})"
             )
-            print(f"✅ Loaded vector store from {self.persist_dir}")
+            return
+
+        print("⚠️  Could not find an existing populated ChromaDB collection.")
+        print("   Run ingestion first, e.g. python rag/ingest/ingest_protests_pdfs.py")
+        self.vectorstore = None
+
+    def _similarity_search(self, query: str, k: int) -> List[Document]:
+        """Shared safe similarity search helper."""
+        if not self.vectorstore:
+            return []
+        try:
+            return self.vectorstore.similarity_search(query, k=k)
         except Exception as e:
-            print(f"⚠️  Could not load vector store: {e}")
-            print("   Creating new store on first ingestion...")
-            self.vectorstore = None
+            print(f"⚠️  similarity_search failed: {e}")
+            return []
     
     def retrieve_financial_context(self, policy_topic: str, k: int = 5) -> str:
         """Get historical financial data for similar policies"""
@@ -42,12 +118,14 @@ class PolicyRAGRetriever:
             return ""
         
         query = f"Financial impact revenue loss budget {policy_topic}"
-        docs = self.vectorstore.similarity_search(query, k=k)
+        docs = self._similarity_search(query, k)
         
         context = "FINANCIAL CONTEXT:\n"
-        for doc in docs:
-            if doc.metadata.get("retrieval_category") == "financial":
-                context += f"- {doc.page_content[:200]}\n"
+        category_docs = [d for d in docs if d.metadata.get("retrieval_category") == "financial"]
+        if not category_docs:
+            category_docs = docs
+        for doc in category_docs:
+            context += f"- {doc.page_content[:200]}\n"
         
         return context
     
@@ -58,13 +136,16 @@ class PolicyRAGRetriever:
             return ""
         
         query = f"{income_class} income class impact {policy_topic}"
-        docs = self.vectorstore.similarity_search(query, k=k)
+        docs = self._similarity_search(query, k)
         
         context = f"DEMOGRAPHIC CONTEXT ({income_class.upper()}):\n"
-        for doc in docs:
-            if doc.metadata.get("retrieval_category") == "demographic_impact":
-                context += f"- Population {doc.metadata.get('affected_population', 'N/A')}\n"
-                context += f"  {doc.page_content[:150]}\n"
+        category_docs = [d for d in docs if d.metadata.get("retrieval_category") == "demographic_impact"]
+        if not category_docs:
+            category_docs = docs
+
+        for doc in category_docs:
+            context += f"- Population {doc.metadata.get('affected_population', 'N/A')}\n"
+            context += f"  {doc.page_content[:150]}\n"
         
         return context
     
@@ -74,16 +155,19 @@ class PolicyRAGRetriever:
             return ""
         
         query = f"historical policy {policy_type} implementation outcomes"
-        docs = self.vectorstore.similarity_search(query, k=k)
+        docs = self._similarity_search(query, k)
         
         context = "HISTORICAL PRECEDENTS:\n"
-        for doc in docs:
-            if doc.metadata.get("document_type") == "historical_outcome":
-                year = doc.metadata.get("implementation_year", "?")
-                revenue = doc.metadata.get("revenue_impact_crores", "?")
-                context += f"- {doc.metadata.get('policy_name', 'Policy')} ({year}): "
-                context += f"₹{revenue}Cr impact\n"
-                context += f"  {doc.page_content[:150]}\n"
+        history_docs = [d for d in docs if d.metadata.get("document_type") == "historical_outcome"]
+        if not history_docs:
+            history_docs = docs
+
+        for doc in history_docs:
+            year = doc.metadata.get("implementation_year", "?")
+            revenue = doc.metadata.get("revenue_impact_crores", "?")
+            context += f"- {doc.metadata.get('policy_name', 'Policy')} ({year}): "
+            context += f"₹{revenue}Cr impact\n"
+            context += f"  {doc.page_content[:150]}\n"
         
         return context
     
@@ -92,12 +176,15 @@ class PolicyRAGRetriever:
         if not self.vectorstore:
             return ""
         
-        docs = self.vectorstore.similarity_search("GDP inflation unemployment growth", k=k)
+        docs = self._similarity_search("GDP inflation unemployment growth", k)
         
         context = "ECONOMIC BASELINE:\n"
-        for doc in docs:
-            if doc.metadata.get("retrieval_category") == "economic_baseline":
-                context += f"- {doc.page_content[:200]}\n"
+        baseline_docs = [d for d in docs if d.metadata.get("retrieval_category") == "economic_baseline"]
+        if not baseline_docs:
+            baseline_docs = docs
+
+        for doc in baseline_docs:
+            context += f"- {doc.page_content[:200]}\n"
         
         return context
     

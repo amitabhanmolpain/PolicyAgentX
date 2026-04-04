@@ -108,9 +108,7 @@ class RAGEnhancedOrchestratorAgent:
         state["historical_context"] = self.rag_retriever.retrieve_historical_precedents(
             policy_type, k=3
         )
-        state["economic_baseline"] = self.rag_retriever.retrieve_economic_baseline(
-            policy_type
-        )
+        state["economic_baseline"] = self.rag_retriever.retrieve_economic_baseline(k=3)
         
         print("✅ RAG Context Retrieved")
         return state
@@ -121,11 +119,11 @@ class RAGEnhancedOrchestratorAgent:
         
         analysis = self.prediction_engine.comprehensive_policy_analysis(
             policy_text=policy_text,
-            context=state.get("financial_context", "")
+            historical_context=state.get("financial_context", "")
         )
         
         state["financial_impact"] = asdict(analysis.financial_impact) if analysis.financial_impact else {}
-        state["demographic_impact"] = [asdict(d) for d in analysis.demographic_impact] if analysis.demographic_impact else []
+        state["demographic_impact"] = [asdict(d) for d in analysis.demographic_impacts] if analysis.demographic_impacts else []
         state["future_projections"] = [asdict(p) for p in analysis.future_projections] if analysis.future_projections else []
         
         print("✅ Predictions Generated")
@@ -202,7 +200,7 @@ Format: Each on one line, max 15 words."""
 
 POLICY: {policy_text}
 
-PREDICTED_REVENUE_IMPACT: ₹{financial_impact.get('net_impact_crores', 'N/A')} Cr
+PREDICTED_REVENUE_IMPACT: ₹{financial_impact.get('net_impact', 'N/A')} Cr
 
 Assess:
 1. REVENUE_GENERATION
@@ -230,7 +228,7 @@ Format: Each on one line, max 15 words."""
         demographic_impact = state.get("demographic_impact", [])
         
         income_impacts = "\n".join([
-            f"- {d.get('income_class')}: {d.get('impact', 'neutral')}"
+            f"- {d.get('income_class')}: net benefit/person ₹{d.get('net_benefit_per_person', 'N/A')}"
             for d in demographic_impact
         ]) if demographic_impact else "No demographic data"
         
@@ -276,6 +274,8 @@ Format: Each on one line, max 15 words."""
         all_analysis = "\n".join([
             str(a) for a in analyses if a
         ])
+        historical_context = state.get("historical_context", "")
+        protest_risk_score = self._estimate_protest_risk_score(policy_text, historical_context)
         
         prompt = f"""Identify top 5 RISKS and MITIGATION for this policy:
 
@@ -284,15 +284,19 @@ POLICY: {policy_text}
 AGENT_ANALYSES:
 {all_analysis}
 
+HISTORICAL_PROTEST_CONTEXT:
+{historical_context}
+
 For each risk, provide:
 RISK_<number>: [Risk description]
 MITIGATION_<number>: [How to mitigate]"""
         
-        response = generate(prompt)
+        response = response_text(generate(prompt))
         
         state["risk_analysis"] = {
             "assessment": response,
             "risks": self._extract_risks(response),
+            "protest_risk_score": protest_risk_score,
         }
         
         print("✅ Risk Assessment Complete")
@@ -317,7 +321,7 @@ Provide actionable recommendations as:
 4. [Fourth recommendation]
 5. [Fifth recommendation]"""
         
-        response = generate(prompt)
+        response = response_text(generate(prompt))
         
         state["recommendations"] = self._extract_recommendations(response)
         
@@ -405,6 +409,21 @@ Provide actionable recommendations as:
                 if rec:
                     recommendations.append(rec)
         return recommendations[:5]
+
+    def _estimate_protest_risk_score(self, policy_text: str, historical_context: str) -> int:
+        """Estimate a protest risk score (1-10) from policy text + RAG context."""
+        score = 3
+        text = (policy_text or "").lower()
+        ctx = (historical_context or "").lower()
+
+        if any(term in text for term in ["reservation", "farm", "language", "citizenship", "water", "quota"]):
+            score += 3
+        if any(term in text for term in ["tax", "subsidy", "price", "employment"]):
+            score += 2
+        if any(term in ctx for term in ["protest", "bandh", "agitation", "demonstration", "violence"]):
+            score += 2
+
+        return max(1, min(10, score))
     
     def _format_report(self, state: dict) -> str:
         """Format comprehensive final report"""
