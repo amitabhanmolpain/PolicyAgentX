@@ -20,6 +20,8 @@ import os
 import io
 import json
 import time
+import ssl
+import argparse
 import requests
 import pandas as pd
 from pathlib import Path
@@ -28,7 +30,8 @@ from dotenv import load_dotenv
 # LangChain
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.document_loaders import OnlinePDFLoader, PyPDFDirectoryLoader
 from langchain_community.vectorstores import Chroma
 
 load_dotenv()
@@ -44,6 +47,23 @@ EMBEDDING_MODEL   = "sentence-transformers/all-MiniLM-L6-v2"
 # Chunk settings — tuned for policy text
 CHUNK_SIZE    = 600
 CHUNK_OVERLAP = 80
+
+# Online PDF ingestion settings for protests DB
+ONLINE_PDF_CHUNK_SIZE = 500
+ONLINE_PDF_CHUNK_OVERLAP = 50
+PROTESTS_PERSIST_DIR = "./chroma_db/protests"
+PROTESTS_COLLECTION_NAME = "langchain"
+LOCAL_PDF_DIR = Path(__file__).resolve().parent / "datasets"
+
+ONLINE_PDF_URLS = {
+    "economic_survey_chapter": "https://www.indiabudget.gov.in/economicsurvey/doc/echapter.pdf",
+    "india_budget_receipts": "https://www.indiabudget.gov.in/doc/rec/allrec.pdf",
+    "pm_kmy_operational_guidelines": "https://pmkisan.gov.in/Documents/PM-KMY%20-%20Operational%20Guidelines.pdf",
+}
+
+# Bypass SSL verification for budget/government PDF hosts with certificate mismatch.
+ssl._create_default_https_context = ssl._create_unverified_context
+requests.packages.urllib3.disable_warnings()
 
 # ─────────────────────────────────────────────
 # DATASET REGISTRY
@@ -170,6 +190,43 @@ def fetch_pdf_text(url: str, name: str) -> str:
         return ""
 
 
+def load_pdf_documents_from_url(url: str, name: str) -> list[Document]:
+    """Load PDF documents from a URL using OnlinePDFLoader first, then fallback to requests + PyPDF2."""
+    try:
+        loader = OnlinePDFLoader(url)
+        documents = loader.load()
+        if documents:
+            return documents
+    except Exception as loader_error:
+        print(f"    ⚠️  OnlinePDFLoader failed for {name}: {loader_error}")
+
+    try:
+        import PyPDF2
+
+        response = requests.get(url, verify=False, timeout=60, headers={"User-Agent": "Mozilla/5.0"})
+        response.raise_for_status()
+        reader = PyPDF2.PdfReader(io.BytesIO(response.content))
+        documents = []
+        for page_index, page in enumerate(reader.pages):
+            text = page.extract_text()
+            if text and text.strip():
+                documents.append(
+                    Document(
+                        page_content=text.strip(),
+                        metadata={
+                            "source": url,
+                            "title": name,
+                            "page": page_index + 1,
+                            "type": "pdf_online",
+                        },
+                    )
+                )
+        return documents
+    except Exception as fallback_error:
+        print(f"    ⚠️  PDF fallback failed for {name}: {fallback_error}")
+        return []
+
+
 def pdf_to_documents(text: str, source: str) -> list[Document]:
     """Split PDF text → LangChain Documents"""
     if not text:
@@ -283,11 +340,98 @@ def build_vectorstore(all_docs: list[Document]):
     return db
 
 
+def ingest_online_pdfs_to_protests() -> int:
+    """Ingest configured online PDFs into the existing protests ChromaDB."""
+    print("\n" + "=" * 55)
+    print("  Online PDF Ingestion -> ChromaDB (protests)")
+    print("=" * 55)
+
+    embeddings = HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL,
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True},
+    )
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=ONLINE_PDF_CHUNK_SIZE,
+        chunk_overlap=ONLINE_PDF_CHUNK_OVERLAP,
+    )
+
+    db = Chroma(
+        persist_directory=PROTESTS_PERSIST_DIR,
+        embedding_function=embeddings,
+        collection_name=PROTESTS_COLLECTION_NAME,
+    )
+
+    total_chunks = 0
+
+    print(f"\n📄 Processing {len(ONLINE_PDF_URLS)} online PDFs...\n")
+    for name, url in ONLINE_PDF_URLS.items():
+        try:
+            print(f"  → {name}")
+            documents = load_pdf_documents_from_url(url, name)
+
+            if not documents:
+                print("     ⚠️  0 pages loaded")
+                continue
+
+            for doc in documents:
+                doc.metadata = {
+                    **(doc.metadata or {}),
+                    "source": url,
+                    "title": name,
+                    "type": "pdf_online",
+                    "retrieval_category": "historical_protest",
+                }
+
+            chunks = splitter.split_documents(documents)
+            if not chunks:
+                print("     ⚠️  0 chunks created")
+                continue
+
+            db.add_documents(chunks)
+            total_chunks += len(chunks)
+            print(f"     ✓ {len(chunks)} chunks")
+
+        except Exception as e:
+            print(f"     ✗ Failed: {e}")
+
+    if LOCAL_PDF_DIR.exists() and LOCAL_PDF_DIR.is_dir():
+        try:
+            print(f"\n📁 Loading local PDFs from {LOCAL_PDF_DIR}...")
+            local_loader = PyPDFDirectoryLoader(str(LOCAL_PDF_DIR))
+            local_docs = local_loader.load()
+            print(f"  ✓ Loaded {len(local_docs)} pages from local PDF directory")
+
+            for doc in local_docs:
+                doc.metadata = {
+                    **(doc.metadata or {}),
+                    "type": "pdf_local",
+                    "retrieval_category": "historical_protest",
+                }
+
+            local_chunks = splitter.split_documents(local_docs)
+            if local_chunks:
+                db.add_documents(local_chunks)
+                total_chunks += len(local_chunks)
+                print(f"  ✓ Added {len(local_chunks)} chunks from local PDFs")
+        except Exception as local_error:
+            print(f"  ⚠️  Local PDF ingestion failed: {local_error}")
+
+    db.persist()
+
+    print("\n" + "-" * 55)
+    print(f"✅ Total online PDF chunks added: {total_chunks}")
+    print(f"✅ Persisted in: {PROTESTS_PERSIST_DIR}/")
+    print("-" * 55 + "\n")
+
+    return total_chunks
+
+
 # ─────────────────────────────────────────────
 # MAIN — orchestrate everything
 # ─────────────────────────────────────────────
 
-def main():
+def main(include_api: bool = False):
     print("=" * 55)
     print("  PolicyAgentX — RAG Ingestion Pipeline")
     print("=" * 55)
@@ -295,17 +439,20 @@ def main():
     all_docs: list[Document] = []
 
     # ── 1. API Datasets ──────────────────────
-    print(f"\n📡 Fetching {len(API_DATASETS)} API datasets from data.gov.in...\n")
-    for name, resource_id in API_DATASETS.items():
-        print(f"  → {name}")
-        records = fetch_api_dataset(resource_id)
-        if records:
-            docs = records_to_documents(records, source=name)
-            all_docs.extend(docs)
-            print(f"     ✓ {len(records)} records → {len(docs)} chunks")
-        else:
-            print(f"     ✗ No data returned (check resource ID or API key)")
-        time.sleep(0.5)   # be polite to the API
+    if include_api:
+        print(f"\n📡 Fetching {len(API_DATASETS)} API datasets from data.gov.in...\n")
+        for name, resource_id in API_DATASETS.items():
+            print(f"  → {name}")
+            records = fetch_api_dataset(resource_id)
+            if records:
+                docs = records_to_documents(records, source=name)
+                all_docs.extend(docs)
+                print(f"     ✓ {len(records)} records → {len(docs)} chunks")
+            else:
+                print(f"     ✗ No data returned (check resource ID or API key)")
+            time.sleep(0.5)   # be polite to the API
+    else:
+        print("\n📡 Skipping data.gov.in API ingestion (broken IDs). Use --include-api to enable it.\n")
 
     # ── 2. PDFs ──────────────────────────────
     print(f"\n📄 Parsing {len(PDF_SOURCES)} PDF documents...\n")
@@ -333,14 +480,34 @@ def main():
     # ── 5. Embed & store ──────────────────────
     build_vectorstore(all_docs)
 
+    # ── 6. Also ingest online protest PDFs into the agent-connected protests DB ──
+    online_total = ingest_online_pdfs_to_protests()
+
     # ── Summary ───────────────────────────────
     print("\n" + "=" * 55)
     print("  Ingestion complete!")
     print(f"  Vector DB path : {PERSIST_DIR}/")
     print(f"  Total chunks   : {len(all_docs)}")
+    print(f"  Protests chunks: {online_total}")
     print("  Next step      : run your FastAPI server")
     print("=" * 55 + "\n")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="PolicyAgentX RAG ingestion")
+    parser.add_argument(
+        "--include-api",
+        action="store_true",
+        help="Include data.gov.in API ingestion even though many resource IDs are currently invalid.",
+    )
+    parser.add_argument(
+        "--online-protests-only",
+        action="store_true",
+        help="Ingest only configured online PDFs into ./chroma_db/protests",
+    )
+    args = parser.parse_args()
+
+    if args.online_protests_only:
+        ingest_online_pdfs_to_protests()
+    else:
+        main(include_api=args.include_api)

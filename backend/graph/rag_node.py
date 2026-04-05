@@ -45,7 +45,10 @@ def rag_node(state: Dict) -> Dict:
             "rag_source": "none",
         }
 
-    retriever = PolicyRAGRetriever()
+    retriever = PolicyRAGRetriever(
+        persist_dir="./chroma_db/protests",
+        collection_name="langchain",
+    )
     historical_context = retriever.retrieve_historical_precedents(policy_type=policy_text, k=4)
     financial_context = retriever.retrieve_financial_context(policy_topic=policy_text, k=2)
     demo_context = retriever.retrieve_demographic_context(income_class="lower_middle", policy_topic=policy_text, k=2)
