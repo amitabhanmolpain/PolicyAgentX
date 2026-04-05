@@ -4,7 +4,7 @@ import GlowCard from "@/components/GlowCard";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 
 import { Award, Loader, AlertCircle, AlertTriangle } from "lucide-react";
-import { getHistory, improvePolicy } from "@/lib/api";
+import { getHistory, improvePolicy, simulatePolicy, FrontendCardsPayload } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface PolicyMetrics {
@@ -21,6 +21,7 @@ interface PolicyMetrics {
 interface ComparisonData {
   original_policy: string;
   improved_policy: string;
+  improved_policy_name?: string;
   original_metrics: PolicyMetrics;
   improved_metrics: PolicyMetrics;
   improvements: {
@@ -29,6 +30,12 @@ interface ComparisonData {
     inflation_improvement: number;
     sentiment_improvement: number;
   };
+  innovation_blocks?: InnovationBlock[];
+  improved_policy_points?: string[];
+  original_policy_cons?: string[];
+  original_summary?: string;
+  improved_summary?: string;
+  gemini_error?: string | null;
 }
 
 const sanitizeText = (text: string) => {
@@ -423,6 +430,8 @@ const ComparePage = () => {
   const [data, setData] = useState<ComparisonData | null>(null);
   const [loading, setLoading] = useState(true);
   const [geminiError, setGeminiError] = useState<string | null>(null);
+  const [sectionDiffLoading, setSectionDiffLoading] = useState(false);
+  const [sectionDiff, setSectionDiff] = useState<{ original: FrontendCardsPayload; improved: FrontendCardsPayload } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -510,14 +519,25 @@ const ComparePage = () => {
         
         console.log("Using policy:", policyText.slice(0, 100));
         
-        // Generate improved version with timeout
-        const improvePromise = improvePolicy(policyText);
-        const improveTimeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Policy improvement timeout - request took too long")), 120000)
-        );
-        
-        const comparisonData = await Promise.race([improvePromise, improveTimeoutPromise]);
+        // Generate improved version with a longer timeout; backend compare can take time.
+        const comparisonData = await improvePolicy(policyText, { timeoutMs: 420000 });
         setData(comparisonData);
+
+        try {
+          setSectionDiffLoading(true);
+          const [originalSim, improvedSim] = await Promise.all([
+            simulatePolicy({ text: policyText, region: "India" }),
+            simulatePolicy({ text: comparisonData.improved_policy || policyText, region: "India" }),
+          ]);
+          setSectionDiff({
+            original: (originalSim.frontend_cards || {}) as FrontendCardsPayload,
+            improved: (improvedSim.frontend_cards || {}) as FrontendCardsPayload,
+          });
+        } catch (sectionErr) {
+          console.error("Failed to fetch section diff data:", sectionErr);
+        } finally {
+          setSectionDiffLoading(false);
+        }
 
         localStorage.setItem("policyCompareData", JSON.stringify(comparisonData));
         localStorage.setItem("policyCompareSourceText", policyText);
@@ -539,7 +559,7 @@ const ComparePage = () => {
         
         if (error instanceof Error) {
           if (error.message.includes("timeout")) {
-            errorMessage = "Request took too long. Please try again.";
+            errorMessage = "Comparison is taking too long. Please retry in a moment, or simplify policy text for a faster run.";
           } else if (error.message.includes("ERR_CONNECTION_REFUSED")) {
             errorMessage = "Backend server is not responding. Please ensure the Flask server is running on http://localhost:5000";
           } else {
@@ -597,61 +617,16 @@ const ComparePage = () => {
         </p>
         {isRecommended ? (
           <div className="space-y-4">
-            {getInnovationBlocks(data?.original_policy || "", policy, metrics).map((block, idx) => (
-              <div key={`${idx}-${block.original.slice(0, 20)}`} className="rounded-2xl border border-emerald-500/15 bg-emerald-500/5 p-4 space-y-2">
-                <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">Original Gap</div>
-                <p className="text-xs text-muted-foreground leading-relaxed">{renderInnovationText(block.original)}</p>
-                <div className="text-[9px] uppercase tracking-[0.18em] text-emerald-400 font-semibold">My Upgrade</div>
-                <p className="text-xs text-emerald-200 leading-relaxed">{renderInnovationText(block.upgrade)}</p>
-                <div className="text-[9px] uppercase tracking-[0.18em] text-cyan-400 font-semibold">Why It Wins</div>
-                <p className="text-xs text-cyan-200 leading-relaxed">{renderInnovationText(block.benefit)}</p>
+            {(data?.innovation_blocks && data.innovation_blocks.length > 0
+              ? data.innovation_blocks
+              : getInnovationBlocks(data?.original_policy || "", policy, metrics)
+            ).map((block, idx) => (
+              <div key={`${idx}-${block.original.slice(0, 20)}`} className="rounded-xl border border-border/30 bg-black/20 p-4 space-y-2">
+                <p className="text-xs text-muted-foreground leading-relaxed"><span className="text-white font-semibold">Issue:</span> {renderInnovationText(block.original)}</p>
+                <p className="text-xs text-white leading-relaxed"><span className="font-semibold">Fix:</span> {renderInnovationText(block.upgrade)}</p>
+                <p className="text-xs text-cyan-300 leading-relaxed"><span className="font-semibold">Impact:</span> {renderInnovationText(block.why_it_wins)}</p>
               </div>
             ))}
-            
-            {(() => {
-              const safeguards = getSafeguardRecommendations(policy, data?.original_policy || "", metrics);
-              return (
-                <div className="space-y-3 mt-4 pt-4 border-t border-emerald-500/20">
-                  {safeguards.hasResidualRisk && (
-                    <div className="rounded-lg border border-orange-500/40 bg-orange-950/20 p-3">
-                      <p className="text-xs font-semibold text-orange-300 flex items-center gap-2">
-                        <AlertTriangle className="w-3 h-3" />
-                        Residual Risk Warning
-                      </p>
-                      <p className="text-[11px] text-orange-200 mt-1">This improved policy still retains contentious elements. External legal/constitutional review is mandatory before implementation.</p>
-                    </div>
-                  )}
-                  
-                  {safeguards.exclusions.length > 0 && (
-                    <div className="rounded-lg border border-red-500/30 bg-red-950/15 p-3">
-                      <p className="text-[9px] font-bold text-red-300 uppercase tracking-wider mb-2">🚫 Do NOT Implement</p>
-                      <ul className="space-y-1">
-                        {safeguards.exclusions.map((exclusion, idx) => (
-                          <li key={idx} className="text-[10px] text-red-200 leading-snug flex gap-1">
-                            <span className="flex-shrink-0">•</span>
-                            <span>{exclusion}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  {safeguards.safeguards.length > 0 && (
-                    <div className="rounded-lg border border-blue-500/30 bg-blue-950/15 p-3">
-                      <p className="text-[9px] font-bold text-blue-300 uppercase tracking-wider mb-2">✓ Implementation Safeguards</p>
-                      <ul className="space-y-1">
-                        {safeguards.safeguards.map((safeguard, idx) => (
-                          <li key={idx} className="text-[10px] text-blue-200 leading-snug flex gap-1">
-                            <span className="flex-shrink-0">→</span>
-                            <span>{safeguard}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
           </div>
         ) : (
           <div className="space-y-3">
@@ -739,8 +714,12 @@ const ComparePage = () => {
     );
   }
 
-  const improvedPolicyPoints = toPolicyPoints(data.improved_policy);
-  const originalPolicyCons = getOriginalCons(data.original_metrics);
+  const improvedPolicyPoints = (data.improved_policy_points && data.improved_policy_points.length > 0)
+    ? data.improved_policy_points.map((p) => normalizeDisplayText(p)).filter((p) => p.length > 10)
+    : toPolicyPoints(data.improved_policy);
+  const originalPolicyCons = (data.original_policy_cons && data.original_policy_cons.length > 0)
+    ? data.original_policy_cons.map((c) => normalizeDisplayText(c)).filter((c) => c.length > 10)
+    : getOriginalCons(data.original_metrics);
   const originalPolicyDisruption = getDisruptionRiskAssessment(data.original_policy, data.original_metrics);
   const hideImprovedPolicy = originalPolicyDisruption.riskLevel !== "low";
 
@@ -765,6 +744,24 @@ const ComparePage = () => {
       sentiment: Number(data.improved_metrics.sentiment_score.toFixed(2)),
     },
   ];
+
+  const sectionKeys: Array<keyof FrontendCardsPayload> = [
+    "policy_summary",
+    "affected_groups",
+    "economic_impact",
+    "timeline",
+    "global_impact",
+    "protest_risk",
+    "improvements",
+  ];
+
+  const sectionTitle = (key: keyof FrontendCardsPayload) => {
+    return key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+  };
+
+  const hasChanged = (a: unknown, b: unknown) => {
+    return JSON.stringify(a || {}) !== JSON.stringify(b || {});
+  };
 
   return (
     <div className="container mx-auto px-8 py-20 max-w-6xl">
@@ -807,7 +804,7 @@ const ComparePage = () => {
           renderPolicyCard(
             data.improved_policy,
             data.improved_metrics,
-            "Improved Policy",
+            data.improved_policy_name || "Improved Policy",
             true
           )
         )}
@@ -827,6 +824,46 @@ const ComparePage = () => {
           </div>
         </motion.div>
       )}
+
+      <GlowCard hoverable={false} className="p-8 mb-12 bg-secondary/10 border-border/20">
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-bold">7-Section Side-by-Side Diff</p>
+          {sectionDiffLoading && <span className="text-xs text-muted-foreground animate-pulse">Loading section diff...</span>}
+        </div>
+
+        {!sectionDiff && !sectionDiffLoading && (
+          <p className="text-sm text-muted-foreground">Section diff unavailable for this run.</p>
+        )}
+
+        {sectionDiff && (
+          <div className="space-y-4">
+            {sectionKeys.map((key) => {
+              const originalSection = sectionDiff.original?.[key] || {};
+              const improvedSection = sectionDiff.improved?.[key] || {};
+              const changed = hasChanged(originalSection, improvedSection);
+
+              return (
+                <div key={key} className={`rounded-lg border p-4 ${changed ? "border-emerald-500/40 bg-emerald-500/5" : "border-border/30 bg-black/10"}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs uppercase tracking-[0.15em] font-bold text-white">{sectionTitle(key)}</p>
+                    {changed && <span className="text-[10px] text-emerald-300 uppercase tracking-[0.12em]">Changed</span>}
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <div className="rounded-md border border-border/25 bg-black/25 p-3">
+                      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">Original</p>
+                      <pre className="text-xs whitespace-pre-wrap break-words text-muted-foreground">{JSON.stringify(originalSection, null, 2)}</pre>
+                    </div>
+                    <div className={`rounded-md border p-3 ${changed ? "border-emerald-500/30 bg-emerald-500/10" : "border-border/25 bg-black/25"}`}>
+                      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">Improved</p>
+                      <pre className={`text-xs whitespace-pre-wrap break-words ${changed ? "text-emerald-200" : "text-muted-foreground"}`}>{JSON.stringify(improvedSection, null, 2)}</pre>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </GlowCard>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
         {!hideImprovedPolicy && (
@@ -914,11 +951,13 @@ const ComparePage = () => {
           <div className="space-y-4">
             <div>
               <p className="text-[9px] text-muted-foreground uppercase mb-2">Economic Impact</p>
-              <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.original_metrics.economic_impact).slice(0, 150)}...</p>
+              <p className="text-xs text-emerald-300 leading-relaxed">
+                {normalizeDisplayText(data.original_summary || data.original_metrics.economic_impact).slice(0, 220)}
+              </p>
             </div>
             <div>
               <p className="text-[9px] text-muted-foreground uppercase mb-2">Social Impact</p>
-              <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.original_metrics.social_impact).slice(0, 150)}...</p>
+              <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.original_metrics.social_impact).slice(0, 220)}</p>
             </div>
           </div>
         </GlowCard>
@@ -929,11 +968,13 @@ const ComparePage = () => {
             <div className="space-y-4">
               <div>
                 <p className="text-[9px] text-muted-foreground uppercase mb-2">Economic Impact</p>
-                <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.improved_metrics.economic_impact).slice(0, 150)}...</p>
+                <p className="text-xs text-emerald-300 leading-relaxed">
+                  {normalizeDisplayText(data.improved_summary || data.improved_metrics.economic_impact).slice(0, 220)}
+                </p>
               </div>
               <div>
                 <p className="text-[9px] text-muted-foreground uppercase mb-2">Social Impact</p>
-                <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.improved_metrics.social_impact).slice(0, 150)}...</p>
+                <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.improved_metrics.social_impact).slice(0, 220)}</p>
               </div>
             </div>
           </GlowCard>

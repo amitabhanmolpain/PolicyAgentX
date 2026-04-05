@@ -16,6 +16,130 @@ try:
 except ImportError:
     pass
 
+ORCHESTRATOR_AVAILABLE = False
+try:
+    from agents.rag_orchestrator import RAGEnhancedOrchestratorAgent
+    ORCHESTRATOR_AVAILABLE = True
+except ImportError:
+    pass
+
+
+def _default_frontend_sections(policy_text: str) -> dict:
+    """Fallback structure for 7-section frontend cards when model output is partial."""
+    text = (policy_text or "").lower()
+
+    amount_match = re.search(r"(?:rs\.?|rupee|rupees)\s*([\d,]+(?:\.\d+)?)", text)
+    monthly_amount = float(amount_match.group(1).replace(",", "")) if amount_match else 1000.0
+
+    if any(k in text for k in ["farmer", "agri", "kisan", "rural"]):
+        base_population = 110_000_000
+    elif any(k in text for k in ["immigrant", "migrant", "migration"]):
+        base_population = 65_000_000
+    elif any(k in text for k in ["student", "education", "school", "college"]):
+        base_population = 260_000_000
+    elif any(k in text for k in ["health", "hospital", "insurance"]):
+        base_population = 400_000_000
+    else:
+        base_population = 150_000_000
+
+    coverage = 0.28 if any(k in text for k in ["low income", "target", "poor", "backward"]) else 0.2
+    people_count = int(base_population * coverage)
+    annual_spend = people_count * monthly_amount * 12.0
+
+    def fmt_people(n: int) -> str:
+        if n >= 10_000_000:
+            return f"{round(n / 10_000_000, 2)} crore people (~{n:,})"
+        if n >= 100_000:
+            return f"{round(n / 100_000, 2)} lakh people (~{n:,})"
+        return f"{n:,} people"
+
+    def fmt_inr(amount: float) -> str:
+        if amount >= 10_000_000:
+            return f"{round(amount / 10_000_000, 2)} crores"
+        if amount >= 100_000:
+            return f"{round(amount / 100_000, 2)} lakhs"
+        return f"{round(amount, 2)} rupees"
+
+    return {
+        "policy_summary": {
+            "simple_meaning": policy_text[:220] if policy_text else "Policy analysis summary unavailable",
+            "issuing_ministry": "To be determined",
+            "implementation_timeline": "Phased rollout recommended",
+            "total_people_impacted_india": fmt_people(people_count),
+            "confidence_score": 35,
+        },
+        "affected_groups": {
+            "groups": [
+                {
+                    "group_name": "Poor / Below Poverty Line",
+                    "population_impact_percent": "N/A",
+                    "status": "BENEFITED",
+                    "reason": "Pending deeper model evidence",
+                },
+            ],
+            "confidence_score": 35,
+        },
+        "economic_impact": {
+            "gdp_impact_percent": "N/A",
+            "revenue_generated_inr_crores": "N/A",
+            "required_public_spend_inr": fmt_inr(annual_spend),
+            "tax_collection_impact": "N/A",
+            "employment_impact_jobs": "N/A",
+            "inflation_risk": "Medium",
+            "fiscal_deficit_impact": "N/A",
+            "confidence_score": 35,
+        },
+        "timeline": {
+            "year_1": {"immediate_effect": "Initial rollout", "adoption_or_growth": "25-40%", "inr_crore_estimate": f"SPEND {fmt_inr(annual_spend * 0.55)}"},
+            "year_2_3": {"immediate_effect": "Scale-up phase", "adoption_or_growth": "45-65%", "inr_crore_estimate": f"SPEND {fmt_inr(annual_spend * 1.35)}"},
+            "year_5": {"immediate_effect": "Stabilization", "adoption_or_growth": "65-82%", "inr_crore_estimate": f"GENERATE {fmt_inr(annual_spend * 0.85)}"},
+            "year_10": {"immediate_effect": "Mature impact", "adoption_or_growth": "80-92%", "inr_crore_estimate": f"GENERATE {fmt_inr(annual_spend * 1.35)}"},
+            "confidence_score": 35,
+        },
+        "global_impact": {
+            "india_global_position": "N/A",
+            "fdi_impact": "N/A",
+            "trade_balance_impact": "N/A",
+            "comparison_usa_china_eu": "N/A",
+            "world_bank_imf_reaction": "N/A",
+            "competitiveness_score_change": "N/A",
+            "confidence_score": 35,
+        },
+        "protest_risk": {
+            "risk_score_1_to_10": 5,
+            "likely_protesting_groups": [],
+            "high_risk_states_cities": [],
+            "historical_similar_protests": [],
+            "confidence_score": 35,
+        },
+        "improvements": {
+            "three_bold_improvements": [
+                "Use targeted eligibility and direct delivery",
+                "Adopt phased rollout with monthly monitoring",
+                "Add protections for vulnerable communities",
+            ],
+            "lower_protest_risk_modified_version": "Pilot-first implementation with grievance redressal",
+            "phased_rollout_recommendation": "Pilot 6 months, scale 18 months",
+            "confidence_score": 35,
+        },
+    }
+
+
+def _merge_frontend_sections(generated: dict, fallback: dict) -> dict:
+    """Ensure all 7 sections exist with confidence scores and safe defaults."""
+    merged = {}
+    for section_key, fallback_value in fallback.items():
+        section_value = generated.get(section_key) if isinstance(generated, dict) else None
+        if isinstance(section_value, dict):
+            merged_section = fallback_value.copy()
+            merged_section.update(section_value)
+            if "confidence_score" not in merged_section:
+                merged_section["confidence_score"] = fallback_value.get("confidence_score", 35)
+            merged[section_key] = merged_section
+        else:
+            merged[section_key] = fallback_value
+    return merged
+
 
 def make_json_serializable(obj):
     """Convert any object to JSON-serializable format"""
@@ -80,6 +204,84 @@ def _simple_stem(word: str) -> str:
 
 def _stem_tokens(text: str):
     return [_simple_stem(token) for token in re.findall(r"[a-zA-Z]+", text or "")]
+
+
+def _parse_json_block(text: str) -> dict:
+    """Parse first valid JSON object from model output."""
+    if not text:
+        return {}
+    candidate = text.strip()
+    try:
+        parsed = json.loads(candidate)
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        pass
+
+    start = candidate.find("{")
+    end = candidate.rfind("}")
+    if start >= 0 and end > start:
+        try:
+            parsed = json.loads(candidate[start:end + 1])
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
+def _midpoint_from_text(value: str, default: float = 0.0) -> float:
+    """Extract midpoint from numeric strings like '1-3%', '+2.5%', '5000-9000'."""
+    if not value:
+        return default
+    nums = re.findall(r"[-+]?\d+(?:\.\d+)?", str(value))
+    if not nums:
+        return default
+    if len(nums) == 1:
+        try:
+            return float(nums[0])
+        except Exception:
+            return default
+    try:
+        return (float(nums[0]) + float(nums[1])) / 2.0
+    except Exception:
+        return default
+
+
+def _extract_metrics_from_simulation_result(sim_result: dict) -> dict:
+    """Extract compare metrics from simulation output without hardcoded display strings."""
+    cards = (sim_result or {}).get("frontend_cards", {}) if isinstance(sim_result, dict) else {}
+    econ = cards.get("economic_impact", {}) if isinstance(cards, dict) else {}
+
+    gdp_growth = _midpoint_from_text(str(econ.get("gdp_impact_percent", "0")), 0.0)
+    inflation_label = str(econ.get("inflation_risk", "Medium")).lower()
+    inflation_impact = 2.8 if "high" in inflation_label else (1.6 if "medium" in inflation_label else 0.8)
+
+    employment_text = str(econ.get("employment_impact_jobs", ""))
+    employment_change = _midpoint_from_text(employment_text, 0.5)
+    if abs(employment_change) > 1000:
+        # Convert large absolute job counts into a bounded relative score for graph compatibility.
+        employment_change = max(-8.0, min(8.0, employment_change / 100000.0))
+
+    protest_score = 5
+    try:
+        protest_score = int(cards.get("protest_risk", {}).get("risk_score_1_to_10", sim_result.get("protest_risk_score", 5)))
+    except Exception:
+        protest_score = 5
+    sentiment_score = max(0.0, min(100.0, 100.0 - (protest_score * 8.5)))
+
+    return {
+        "economic_impact": str((sim_result or {}).get("economic_impact", "")),
+        "social_impact": str((sim_result or {}).get("social_impact", "")),
+        "business_impact": str((sim_result or {}).get("business_impact", "")),
+        "government_impact": str((sim_result or {}).get("government_impact", "")),
+        "rag_context": str((sim_result or {}).get("rag_context", "")),
+        "historical_protest_cases": (sim_result or {}).get("historical_protest_cases", []),
+        "protest_risk_score": protest_score,
+        "inflation_impact": float(inflation_impact),
+        "gdp_growth": float(gdp_growth),
+        "employment_change": float(employment_change),
+        "sentiment_score": float(sentiment_score),
+        "revenue_generated_inr_crores": str(econ.get("revenue_generated_inr_crores", "")),
+    }
 
 
 def _has_required_innovation_structure(text: str) -> bool:
@@ -270,9 +472,31 @@ def handle_simulation(data):
 
         # Initialize state for graph
         state = initialize_state(policy.text, policy.region)
-        
-        # run LangGraph pipeline
+
+        # Run baseline LangGraph pipeline
         result = graph.invoke(state)
+
+        # Run deep structured orchestrator for 7-section JSON cards
+        fallback_sections = _default_frontend_sections(policy.text)
+        frontend_cards = fallback_sections
+        orchestrator_error = None
+
+        if ORCHESTRATOR_AVAILABLE:
+            try:
+                orchestrator = RAGEnhancedOrchestratorAgent()
+                orchestration_result = orchestrator.analyze_policy(policy.text, policy.region)
+                generated_cards = orchestration_result.get("frontend_cards", {})
+                frontend_cards = _merge_frontend_sections(generated_cards, fallback_sections)
+
+                # Merge key risk values into baseline result if present
+                if isinstance(orchestration_result.get("risk_analysis"), dict):
+                    result["risk_analysis"] = {
+                        **(result.get("risk_analysis") or {}),
+                        **orchestration_result.get("risk_analysis", {}),
+                    }
+            except Exception as orchestrator_exc:
+                orchestrator_error = str(orchestrator_exc)
+                frontend_cards = fallback_sections
 
         # Extract structured data from agent analyses
         economic_data = result.get("economic_analysis", {})
@@ -287,6 +511,14 @@ def handle_simulation(data):
             "policy_text": policy.text,
             "region": policy.region,
             "timestamp": datetime.now().isoformat(),
+            "frontend_cards": frontend_cards,
+            "policy_summary": frontend_cards.get("policy_summary", {}),
+            "affected_groups_section": frontend_cards.get("affected_groups", {}),
+            "economic_impact_section": frontend_cards.get("economic_impact", {}),
+            "timeline": frontend_cards.get("timeline", {}),
+            "global_impact": frontend_cards.get("global_impact", {}),
+            "protest_risk_section": frontend_cards.get("protest_risk", {}),
+            "improvements": frontend_cards.get("improvements", {}),
             "rag_source": str(result.get("rag_source", "")),
             "rag_context": str(result.get("rag_context", "")),
             "historical_protest_cases": result.get("historical_protest_cases", []),
@@ -302,6 +534,9 @@ def handle_simulation(data):
             "explanation": str(recommendation_data.get("recommendation_analysis", "")),
             "recommendation": str(recommendation_data.get("optimized_policy", "")),
         }
+
+        if orchestrator_error:
+            final_result["orchestrator_error"] = orchestrator_error
 
         # Make sure all values are JSON-serializable
         final_result = make_json_serializable(final_result)
@@ -590,143 +825,179 @@ def handle_improve_policy(data):
         print("="*60)
         print(f"Original Policy: {original_policy[:100]}...")
         
-        # Generate improved policy using Gemini
-        improved_policy = original_policy  # Default to original
+        # Generate improved policy + compare-ready innovation blocks using strict JSON
+        improved_policy = original_policy
+        improved_policy_name = "Improved Policy"
+        innovation_blocks = []
+        improved_policy_points = []
+        original_cons = []
         gemini_error = None
-        
+
         try:
             from app.services.gemini_service import generate, is_error_response
-            
+
             improvement_prompt = f"""
-You are a bold, visionary Indian policy architect.
+You are India's best policy economist and architect. Think DEEPLY about real constraints, tradeoffs, and unintended consequences.
 
-Original policy idea:
-"{original_policy}"
+ORIGINAL POLICY:
+{original_policy}
 
-Task:
-Create a UNIQUE improved policy that is clearly built from the original idea, but significantly better.
+YOUR TASK:
+1. Identify concrete structural weaknesses (not vague criticisms)
+2. Propose measurable, implementable improvements with numbers and mechanisms
+3. Consider fiscal sustainability, social impact, behavioral responses
+4. Address real barriers: administrative capacity, political feasibility, implementation systems
 
-Hard rules:
-1) Do NOT write generic explanations like "what this policy means".
-2) Do NOT criticize vaguely. Show exact upgrades over the original.
-3) Every innovation must be specific, implementable, and measurable.
-4) Use plain text only. No markdown symbols.
-5) Think like a decisive policymaker: propose one strong mechanism that changes how the policy actually works.
-6) If the original policy is about subsidies, benefits, welfare, tax, farmers, or households, upgrade it with direct targeting, live verification, automation, and leakage prevention.
-7) Avoid filler language. Every bullet must change the policy design in a meaningful way.
+Return VALID JSON ONLY (no markdown, no code blocks, no explanation outside JSON):
+{{
+  "policy_name": "specific memorable name",
+  "improved_policy_text": "Full detailed improved policy (8-15 sentences). Must include: WHO exactly benefits, HOW much in rupees/day/month, WHEN each phase, WHAT enforcement/verification mechanisms, WHY this addresses original's gaps, HOW it avoids original's pitfalls.",
+  "innovation_blocks": [
+    {{"original_gap": "concrete weakness from original", "upgrade": "specific solution with implementation details", "why_it_wins": "quantified benefit with measurable impact"}},
+    {{"original_gap": "...", "upgrade": "...", "why_it_wins": "..."}},
+    {{"original_gap": "...", "upgrade": "...", "why_it_wins": "..."}}
+  ],
+  "improved_policy_points": ["substantive advantage 1 with specifics", "substantive advantage 2 with specifics", "substantive advantage 3 with specifics", "substantive advantage 4 with specifics"],
+  "original_policy_cons": ["real fiscal/social risk 1: explain downside", "real fiscal/social risk 2: explain downside", "real fiscal/social risk 3: explain downside", "real fiscal/social risk 4: explain downside"]
+}}
 
-Output format (strict):
-Policy Name: <short memorable name>
+REAL CON EXAMPLES (for a farmer pension of rupees 3000/month):
+- "Fiscal burden: 3000/month × 15 crore small farmers × 12 = 54,000 crore annually; this diverts funds from irrigation/electricity/schools"
+- "Inflation risk: Increasing rural purchasing power without corresponding supply increase could push food prices up 4-7%, harming urban poor and city workers"
+- "Opportunity cost: This 54,000 crore/year could alternatively fund: 100,000 irrigation wells, rural electrification for 500 districts, or 50,000 primary schools"
+- "Moral hazard: Unconditional cash without productivity conditions may reduce farmers' incentive to adopt better cultivation practices, irrigation tech, or value-added processing"
+- "Taxpayer perception: Lower-middle class taxpayers (IT, services, small business) who earn 30-50k/month may resist subsidizing farmers earning same; political backlash risk"
+- "Administrative leakage: Verifying eligibility (landholding, income, farming status) across villages requires systems 60% of states lack; expect 15-30% fraud/duplication"
+- "Dependency trap: Unconditional support for 20+ years without skill development or technology adoption may leave farmers unprepared for climate shocks, market shifts, or generational transition"
 
-Innovation Deltas From Original:
-- Original: <what original policy did>
-    Upgrade: <what you changed>
-    Benefit: <economic/social/government benefit in one line>
-- Original: ...
-    Upgrade: ...
-    Benefit: ...
-- Original: ...
-    Upgrade: ...
-    Benefit: ...
-
-Execution Blueprint:
-- Phase 1 (0-6 months): <owners, actions, enforcement>
-- Phase 2 (6-18 months): <scale-up, tech systems, course correction>
-
-Expected Measurable Outcomes:
-- GDP impact: <range or estimate>
-- Employment impact: <range or estimate>
-- Inflation impact: <range or estimate>
-
-Tech/AI Edge:
-- <1-2 concrete digital or AI mechanisms that make this policy superior>
+Be intellectually rigorous. Show you understand real tradeoffs, fiscal algebra, and behavioral economics.
 """
-            
-            improved_policy = generate(improvement_prompt, temperature=0.7, max_tokens=1024)
-            if is_error_response(improved_policy):
-                raise RuntimeError(improved_policy["error"])
-            
-            if not _has_required_innovation_structure(improved_policy):
-                print(f"⚠️ Model output missing required structure, using fallback instead")
-                gemini_error = "Model output format incorrect; using fallback"
-                improved_policy = _build_policy_innovation_fallback(original_policy)
-            else:
-                print(f"✅ Improved policy generated with correct structure")
-                print(f"Improved version: {improved_policy[:100]}...")
-            
+
+            improved_json_text = generate(improvement_prompt, temperature=0.45, max_tokens=1400)
+            if is_error_response(improved_json_text):
+                raise RuntimeError(improved_json_text["error"])
+
+            first_text = str(improved_json_text).replace("```json", "").replace("```", "").strip()
+            parsed = _parse_json_block(first_text)
+            candidate_policy = str(parsed.get("improved_policy_text", "")).strip()
+
+            if len(candidate_policy) < 40:
+                retry_prompt = (
+                    "Your previous output was not parseable JSON. "
+                    "Return ONLY valid JSON with the exact same schema and no markdown fences."
+                    f"\n\nOriginal policy:\n{original_policy}"
+                )
+                retry_text = generate(retry_prompt, temperature=0.2, max_tokens=1400)
+                if not is_error_response(retry_text):
+                    second_text = str(retry_text).replace("```json", "").replace("```", "").strip()
+                    retry_parsed = _parse_json_block(second_text)
+                    if isinstance(retry_parsed, dict) and retry_parsed.get("improved_policy_text"):
+                        parsed = retry_parsed
+                        candidate_policy = str(parsed.get("improved_policy_text", "")).strip()
+
+            if len(candidate_policy) < 40:
+                raise RuntimeError("Improved policy JSON missing improved_policy_text")
+
+            improved_policy = candidate_policy
+            improved_policy_name = str(parsed.get("policy_name", "Improved Policy")).strip() or "Improved Policy"
+            innovation_blocks = parsed.get("innovation_blocks", []) if isinstance(parsed.get("innovation_blocks"), list) else []
+            improved_policy_points = parsed.get("improved_policy_points", []) if isinstance(parsed.get("improved_policy_points"), list) else []
+            original_cons = parsed.get("original_policy_cons", []) if isinstance(parsed.get("original_policy_cons"), list) else []
+
+            print("✅ Improved policy JSON generated")
+            print(f"Improved version: {improved_policy[:120]}...")
+
         except Exception as gen_error:
             error_str = str(gen_error)
             print(f"⚠️ Gemini generation error: {error_str}")
             gemini_error = error_str
-            
-            # Create improved policy based on heuristics if Gemini fails
             improved_policy = _build_policy_innovation_fallback(original_policy)
         
-        # Now simulate both policies to get comparison data
+        # Simulate both policies using the same /simulate logic used by frontend.
         try:
             print("\n📊 Simulating original policy...")
-            original_result = graph.invoke(initialize_state(original_policy, "India"))
+            original_result, original_status = handle_simulation({"text": original_policy, "region": "India"})
+            if original_status != 200:
+                raise RuntimeError(str(original_result.get("error", "Original simulation failed")))
         except Exception as sim_error:
             print(f"⚠️ Original simulation error: {str(sim_error)}")
             original_result = {}
-        
+
         try:
             print("📊 Simulating improved policy...")
-            improved_result = graph.invoke(initialize_state(improved_policy, "India"))
+            improved_result, improved_status = handle_simulation({"text": improved_policy, "region": "India"})
+            if improved_status != 200:
+                raise RuntimeError(str(improved_result.get("error", "Improved simulation failed")))
         except Exception as sim_error:
             print(f"⚠️ Improved simulation error: {str(sim_error)}")
             improved_result = {}
-        
-        # Extract and compare metrics
-        def extract_metrics(result, policy_text):
-            try:
-                economic = str(result.get("economic_analysis", {}).get("economic_analysis", ""))
-                social = str(result.get("social_analysis", {}).get("social_analysis", ""))
-                business = str(result.get("business_analysis", {}).get("business_analysis", ""))
-                government = str(result.get("government_analysis", {}).get("government_analysis", ""))
-            except:
-                economic = social = business = government = "Analysis in progress"
-            
-            # Calculate sentiment scores (0-100)
-            def sentiment_score(text):
-                positive_words = ['benefits', 'positive', 'increase', 'boost', 'improve', 'growth', 'strength', 'advantage', 'better', 'efficient']
-                negative_words = ['decrease', 'loss', 'decline', 'harm', 'reduce', 'negative', 'challenge', 'risk', 'burden']
 
-                stems = _stem_tokens(text)
-                if not stems:
-                    return 50
+        original_metrics = _extract_metrics_from_simulation_result(original_result)
+        improved_metrics = _extract_metrics_from_simulation_result(improved_result)
 
-                positive_stems = {_simple_stem(word) for word in positive_words}
-                negative_stems = {_simple_stem(word) for word in negative_words}
+        # Build AI compare intelligence so frontend is not forced to synthesize hardcoded text.
+        compare_intelligence = {}
+        try:
+            from app.services.gemini_service import generate, is_error_response
 
-                positive = sum(1 for stem in stems if stem in positive_stems)
-                negative = sum(1 for stem in stems if stem in negative_stems)
-                total = positive + negative
-                
-                if total == 0:
-                    return 50
-                return min(100, max(0, int((positive / (positive + negative)) * 100)))
-            
-            econ_score = sentiment_score(economic)
-            soc_score = sentiment_score(social)
-            bus_score = sentiment_score(business)
-            
-            return {
-                "economic_impact": economic if economic and economic != "Analysis in progress" else "Economic benefits being analyzed",
-                "social_impact": social if social and social != "Analysis in progress" else "Social impact being assessed",
-                "business_impact": business if business and business != "Analysis in progress" else "Business implications pending",
-                "government_impact": government if government and government != "Analysis in progress" else "Government coordination needed",
-                "rag_context": str(result.get("rag_context", "")),
-                "historical_protest_cases": result.get("historical_protest_cases", []),
-                "protest_risk_score": int(result.get("risk_analysis", {}).get("protest_risk_score", result.get("protest_risk_score", 5))),
-                "inflation_impact": -0.3 + (econ_score / 100 * 0.5),
-                "gdp_growth": 0.5 + (econ_score / 100 * 2),
-                "employment_change": 0.3 + (soc_score / 100 * 2),
-                "sentiment_score": (econ_score + soc_score + bus_score) / 3
-            }
-        
-        original_metrics = extract_metrics(original_result, original_policy)
-        improved_metrics = extract_metrics(improved_result, improved_policy)
+            intelligence_prompt = f"""
+You are a senior Indian policy economist and evaluator with deep domain expertise.
+
+ORIGINAL POLICY:
+{original_policy}
+
+IMPROVED POLICY:
+{improved_policy}
+
+Original simulation:
+{json.dumps((original_result or {}).get('frontend_cards', {}), ensure_ascii=False)[:6000]}
+
+Improved simulation:
+{json.dumps((improved_result or {}).get('frontend_cards', {}), ensure_ascii=False)[:6000]}
+
+Return VALID JSON ONLY (no markdown, no code blocks):
+{{
+  "innovation_blocks": [
+    {{"original_gap": "realistic weakness", "upgrade": "concrete improvement", "why_it_wins": "specific measurable benefit"}},
+    {{"original_gap": "...", "upgrade": "...", "why_it_wins": "..."}},
+    {{"original_gap": "...", "upgrade": "...", "why_it_wins": "..."}}
+  ],
+  "improved_policy_points": ["substantive pro 1", "substantive pro 2", "substantive pro 3", "substantive pro 4", "substantive pro 5"],
+  "original_policy_cons": ["fiscal/social risk 1: specific impact", "fiscal/social risk 2: specific impact", "fiscal/social risk 3: specific impact", "fiscal/social risk 4: specific impact"],
+  "original_summary": "honest assessment of original (include limitations)",
+  "improved_summary": "how improved version addresses those limitations"
+}}
+
+CRITICAL ANALYSIS GUIDANCE:
+For agriculture/farm subsidies:
+- Fiscal cost per beneficiary per year
+- Inflation risk on food prices
+- Urban income class perception
+- Tax burden on high earners
+- Administrative overhead
+
+Be intellectually rigorous. Identify REAL tradeoffs, not generic improvements.
+"""
+
+            intelligence_text = generate(intelligence_prompt, temperature=0.35, max_tokens=1200)
+            if not is_error_response(intelligence_text):
+                compare_intelligence = _parse_json_block(str(intelligence_text))
+        except Exception as intelligence_error:
+            print(f"⚠️ Compare intelligence generation failed: {str(intelligence_error)}")
+
+        if not isinstance(compare_intelligence, dict):
+            compare_intelligence = {}
+
+        if not compare_intelligence.get("innovation_blocks") and innovation_blocks:
+            compare_intelligence["innovation_blocks"] = innovation_blocks
+        if not compare_intelligence.get("improved_policy_points") and improved_policy_points:
+            compare_intelligence["improved_policy_points"] = improved_policy_points
+        if not compare_intelligence.get("original_policy_cons") and original_cons:
+            compare_intelligence["original_policy_cons"] = original_cons
+        if not compare_intelligence.get("original_summary"):
+            compare_intelligence["original_summary"] = str(original_metrics.get("economic_impact", "")).strip()[:260]
+        if not compare_intelligence.get("improved_summary"):
+            compare_intelligence["improved_summary"] = str(improved_metrics.get("economic_impact", "")).strip()[:260]
         
         # Calculate improvements
         improvements = {
@@ -740,10 +1011,16 @@ Tech/AI Edge:
         
         result = {
             "original_policy": original_policy,
+            "improved_policy_name": improved_policy_name,
             "improved_policy": improved_policy,
             "original_metrics": original_metrics,
             "improved_metrics": improved_metrics,
             "improvements": improvements,
+            "innovation_blocks": compare_intelligence.get("innovation_blocks", []),
+            "improved_policy_points": compare_intelligence.get("improved_policy_points", []),
+            "original_policy_cons": compare_intelligence.get("original_policy_cons", []),
+            "original_summary": compare_intelligence.get("original_summary", ""),
+            "improved_summary": compare_intelligence.get("improved_summary", ""),
             "timestamp": datetime.now().isoformat(),
             "recommendation": "Adopt the improved policy version for better socio-economic outcomes" if improvements["sentiment_improvement"] > 0 else "Further refinement recommended",
             "gemini_error": gemini_error

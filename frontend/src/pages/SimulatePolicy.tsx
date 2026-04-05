@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import GlowCard from "@/components/GlowCard";
 import ChatMessageList from "@/components/ChatMessageList";
 import ChatInput from "@/components/ChatInput";
+import SimulateResult from "@/components/SimulateResult";
+import DinoLoadingGame from "@/components/DinoLoadingGame";
+import SimulateErrorBoundary from "@/components/SimulateErrorBoundary";
 import { simulatePolicy, SimulationResult } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -38,6 +41,44 @@ const countStemMatches = (text: string, keywords: string[]): number => {
 
 const normalizeDisplayText = (text: string): string => {
   return (text || "").replace(/_/g, " ").replace(/\s+/g, " ").trim();
+};
+
+const toTitleCase = (text: string): string => {
+  return normalizeDisplayText(text)
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+};
+
+const simplifyImpactLabel = (label: string): string => {
+  const clean = normalizeDisplayText(label).replace(/:$/, "").toLowerCase();
+
+  if (clean.includes("gdp")) return "Economy effect";
+  if (clean.includes("inflation")) return "Price effect";
+  if (clean.includes("employment")) return "Jobs effect";
+  if (clean.includes("middle class")) return "Middle-class effect";
+  if (clean.includes("small business")) return "Small business effect";
+  if (clean.includes("business")) return "Business effect";
+  if (clean.includes("government")) return "Government effect";
+  if (clean.includes("social")) return "Social effect";
+
+  return toTitleCase(clean);
+};
+
+const cleanImpactLine = (line: string): string => {
+  return normalizeDisplayText(line)
+    .replace(/^[\-•→\d.)\s]+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const splitImpactLines = (text: string): string[] => {
+  return (text || "")
+    .split(/\n+/)
+    .map(cleanImpactLine)
+    .filter((line) => line.length > 0)
+    .slice(0, 4);
 };
 
 interface ResultItem {
@@ -417,37 +458,90 @@ const SimulatePolicyPage = () => {
 
   const labelClass = "text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-semibold mb-3 block";
 
-  const analyzeImpactSentiment = (text: string): number => {
-    if (!text) return 0;
-    const positive = countStemMatches(text, ["benefits", "positive", "increase", "boost", "improve", "growth", "strength"]);
-    const negative = countStemMatches(text, ["decrease", "loss", "decline", "harm", "reduce", "negative", "worsen"]);
-    const neutral = countStemMatches(text, ["unchanged", "stable", "maintain"]);
-    const total = positive + negative + neutral;
-    if (total === 0) return 50;
-    return Math.round((positive / total) * 100);
+  const parseNumericMidpoint = (value?: string): number => {
+    const text = (value || "").toString();
+    const nums = text.match(/[-+]?\d+(?:\.\d+)?/g) || [];
+    if (nums.length === 0) return 0;
+    if (nums.length === 1) return Number(nums[0]) || 0;
+    const a = Number(nums[0]);
+    const b = Number(nums[1]);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return 0;
+    return (a + b) / 2;
+  };
+
+  const parseIndiaCount = (value?: string): number => {
+    const text = (value || "").toLowerCase();
+    const nums = text.match(/\d+(?:\.\d+)?/g) || [];
+    if (nums.length === 0) return 0;
+    const first = Number(nums[0]);
+    const second = nums.length > 1 ? Number(nums[1]) : first;
+    const mid = (first + second) / 2;
+    if (text.includes("crore")) return mid * 10_000_000;
+    if (text.includes("lakh")) return mid * 100_000;
+    return mid;
+  };
+
+  const parseMoneyToCrores = (value?: string): number => {
+    const text = (value || "").toLowerCase();
+    const nums = text.match(/\d+(?:\.\d+)?/g) || [];
+    if (nums.length === 0) return 0;
+    const first = Number(nums[0]);
+    const second = nums.length > 1 ? Number(nums[1]) : first;
+    const mid = (first + second) / 2;
+    if (text.includes("crore")) return mid;
+    if (text.includes("lakh")) return mid / 100;
+    if (text.includes("rupee") || text.includes("rs") || text.includes("inr")) return mid / 10_000_000;
+    return mid;
+  };
+
+  const clampScore = (n: number): number => Math.max(0, Math.min(100, Math.round(n)));
+
+  const derivePolicyScores = () => {
+    const cards = apiResults?.frontend_cards;
+    if (!cards) {
+      return { economic: 50, social: 50, business: 50, government: 50 };
+    }
+
+    const gdp = parseNumericMidpoint(cards.economic_impact?.gdp_impact_percent);
+    const revenue = parseNumericMidpoint(cards.economic_impact?.revenue_generated_inr_crores);
+    const requiredSpendCrores = parseMoneyToCrores(cards.economic_impact?.required_public_spend_inr);
+    const inflation = (cards.economic_impact?.inflation_risk || "medium").toLowerCase();
+    const inflationPenalty = inflation.includes("high") ? 18 : inflation.includes("medium") ? 9 : 3;
+
+    const risk = Number(cards.protest_risk?.risk_score_1_to_10 || 5);
+    const impacted = parseIndiaCount(cards.policy_summary?.total_people_impacted_india);
+    const impactedScale = Math.min(18, Math.log10(Math.max(1, impacted)) * 2.5);
+
+    const econ = clampScore(45 + (gdp * 14) + (Math.log10(Math.max(1, revenue)) * 6) - (Math.log10(Math.max(1, requiredSpendCrores)) * 4) - inflationPenalty);
+    const social = clampScore(40 + impactedScale - (risk * 4));
+    const business = clampScore(42 + (Math.log10(Math.max(1, revenue)) * 7) - (risk * 2));
+    const government = clampScore(65 - (risk * 5) - (Math.log10(Math.max(1, requiredSpendCrores)) * 2));
+
+    return { economic: econ, social, business, government };
   };
 
   const getImpactChartData = () => {
     if (!apiResults) return [];
+    const score = derivePolicyScores();
     return [
       {
         name: "Economic",
-        score: analyzeImpactSentiment(apiResults.economic_impact),
+        score: score.economic,
         impact: "economic_impact"
       },
       {
         name: "Social",
-        score: analyzeImpactSentiment(apiResults.social_impact),
+        score: score.social,
         impact: "social_impact"
       },
       {
         name: "Business",
-        score: analyzeImpactSentiment(apiResults.business_impact),
+        score: score.business,
         impact: "business_impact"
       },
       {
         name: "Government",
-        score: analyzeImpactSentiment(apiResults.government_impact),
+        score: score.government,
         impact: "government_impact"
       },
     ];
@@ -463,35 +557,41 @@ const SimulatePolicyPage = () => {
         employment: 95 + (i * 0.25),
       }));
     }
-    
+
+    const cards = apiResults.frontend_cards;
+    const gdpMid = parseNumericMidpoint(cards?.economic_impact?.gdp_impact_percent);
+    const inflationRisk = (cards?.economic_impact?.inflation_risk || "medium").toLowerCase();
+    const inflationBase = inflationRisk.includes("high") ? 4.4 : inflationRisk.includes("medium") ? 3.2 : 2.0;
+    const timelineSpend = [
+      parseMoneyToCrores(cards?.timeline?.year_1?.inr_crore_estimate),
+      parseMoneyToCrores(cards?.timeline?.year_2_3?.inr_crore_estimate),
+      parseMoneyToCrores(cards?.timeline?.year_5?.inr_crore_estimate),
+      parseMoneyToCrores(cards?.timeline?.year_10?.inr_crore_estimate),
+    ];
+    const avgSpend = timelineSpend.reduce((a, b) => a + b, 0) / Math.max(1, timelineSpend.length);
+
     const months = ["Month 1", "Month 2", "Month 3", "Month 4", "Month 5", "Month 6"];
-    const economicScore = analyzeImpactSentiment(apiResults.economic_impact);
-    const baseSentiment = (economicScore - 50) / 50; // -1 to 1
-    
+
     return months.map((month, i) => {
-      const monthIndex = (i + 1) / 6;
+      const t = i / 5;
       return {
         month,
-        inflation: Math.max(1.0, 2.5 - (i * 0.25) - (baseSentiment * 0.5)),
-        gdp: 3.0 + (i * 0.4) + (baseSentiment * 0.8),
-        employment: 94.5 + (i * 0.3) + (baseSentiment * 0.5),
+        inflation: Math.max(1.0, inflationBase - (gdpMid * 0.22) + (Math.log10(Math.max(1, avgSpend)) * 0.06) + (t * 0.35)),
+        gdp: Math.max(0.5, 2.6 + (gdpMid * 0.8) + (t * 1.4)),
+        employment: 93.5 + (gdpMid * 0.75) + (t * 1.8),
       };
     });
   };
 
   const getDynamicComparisonData = () => {
     if (!apiResults) return [];
-    
-    const economicScore = analyzeImpactSentiment(apiResults.economic_impact);
-    const socialScore = analyzeImpactSentiment(apiResults.social_impact);
-    const businessScore = analyzeImpactSentiment(apiResults.business_impact);
-    const governmentScore = analyzeImpactSentiment(apiResults.government_impact);
+    const score = derivePolicyScores();
     
     return [
-      { name: "Economic", value: economicScore },
-      { name: "Social", value: socialScore },
-      { name: "Business", value: businessScore },
-      { name: "Government", value: governmentScore },
+      { name: "Economic", value: score.economic },
+      { name: "Social", value: score.social },
+      { name: "Business", value: score.business },
+      { name: "Government", value: score.government },
     ];
   };
 
@@ -501,6 +601,8 @@ const SimulatePolicyPage = () => {
     if (score < 70) return "#3b82f6"; // blue
     return "#10b981"; // green
   };
+
+  const quickScoreMap = derivePolicyScores();
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-64px)] w-full bg-background relative">
@@ -636,8 +738,24 @@ const SimulatePolicyPage = () => {
 
       {/* Main Scroller Area */}
       <div className="flex-1 px-4 md:px-0">
-        <div className="max-w-4xl mx-auto w-full py-6 md:py-8 flex flex-col gap-6 pb-[140px]">
+        <div className="max-w-4xl mx-auto w-full py-6 md:py-8 flex flex-col gap-6 pb-[230px] md:pb-[250px]">
           <ChatMessageList messages={messages} loading={loading} />
+
+          <AnimatePresence>
+            {loading && (
+              <motion.div
+                key="dino-loading-game"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10, scale: 0.985 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+              >
+                <GlowCard hoverable={false} className="p-5 bg-secondary/10 border-border/20">
+                  <DinoLoadingGame />
+                </GlowCard>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <AnimatePresence>
             {showResults && (
@@ -658,12 +776,12 @@ const SimulatePolicyPage = () => {
                 {/* Quick Impact Summary */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-2 md:px-0">
                   {apiResults && [
-                    { label: "Economic", value: apiResults.economic_impact, color: "from-blue-500 to-blue-400" },
-                    { label: "Social", value: apiResults.social_impact, color: "from-emerald-500 to-emerald-400" },
-                    { label: "Business", value: apiResults.business_impact, color: "from-purple-500 to-purple-400" },
-                    { label: "Government", value: apiResults.government_impact, color: "from-amber-500 to-amber-400" },
+                    { label: "Economic", score: quickScoreMap.economic, color: "from-blue-500 to-blue-400" },
+                    { label: "Social", score: quickScoreMap.social, color: "from-emerald-500 to-emerald-400" },
+                    { label: "Business", score: quickScoreMap.business, color: "from-purple-500 to-purple-400" },
+                    { label: "Government", score: quickScoreMap.government, color: "from-amber-500 to-amber-400" },
                   ].map((r, i) => {
-                    const score = analyzeImpactSentiment(r.value);
+                    const score = r.score;
                     return (
                       <motion.div
                         key={r.label}
@@ -700,13 +818,16 @@ const SimulatePolicyPage = () => {
                       <div key={idx} className="space-y-4">
                         <p className="text-[9px] text-muted-foreground uppercase tracking-[0.15em] font-bold">{section.label}</p>
                         <div className="space-y-2">
-                          {section.value.split('\n').slice(0, 4).map((line, lineIdx) => {
-                            const cleanLine = line.trim();
-                            if (!cleanLine || cleanLine.length < 10) return null;
+                          {splitImpactLines(section.value).map((line, lineIdx) => {
+                            const [rawLabel, ...rest] = line.split(":");
+                            const hasLabel = rest.length > 0;
+                            const label = hasLabel ? simplifyImpactLabel(rawLabel) : "Detail";
+                            const content = hasLabel ? rest.join(":").trim() : line;
+
                             return (
-                              <div key={lineIdx} className="flex gap-2">
-                                <span className="text-accent font-bold text-xs flex-shrink-0 mt-0.5">→</span>
-                                <p className="text-xs text-muted-foreground leading-relaxed">{normalizeDisplayText(cleanLine).slice(0, 100)}</p>
+                              <div key={lineIdx} className="rounded-xl border border-border/20 bg-black/20 px-3 py-2.5">
+                                <p className="text-[10px] uppercase tracking-[0.14em] text-accent font-bold mb-1">{label}</p>
+                                <p className="text-xs text-muted-foreground leading-relaxed">{content}</p>
                               </div>
                             );
                           })}
@@ -774,6 +895,14 @@ const SimulatePolicyPage = () => {
                     </ResponsiveContainer>
                   </GlowCard>
                 </div>
+
+                {/* New Deep Analysis Cards (shown after legacy sections) */}
+                <GlowCard hoverable={false} className="p-5 bg-secondary/10 border-border/20">
+                  <p className={labelClass + " mb-4"}>Deep Sectioned Analysis</p>
+                  <SimulateErrorBoundary>
+                    <SimulateResult results={apiResults} />
+                  </SimulateErrorBoundary>
+                </GlowCard>
               </motion.div>
             )}
           </AnimatePresence>
@@ -782,7 +911,7 @@ const SimulatePolicyPage = () => {
 
       {/* Input Overlay */}
       <div className="fixed bottom-0 left-0 right-0 z-[100] pointer-events-none">
-        <div className="max-w-3xl mx-auto w-full px-2 md:px-3 pb-2 md:pb-3 pointer-events-auto bg-gradient-to-t from-background to-transparent pt-8">
+        <div className="max-w-3xl mx-auto w-full px-2 md:px-3 pb-3 md:pb-4 pointer-events-auto bg-gradient-to-t from-background via-background/95 to-transparent pt-10">
           <ChatInput 
             onSendMessage={handleSendMessage}
             isLoading={loading} 
