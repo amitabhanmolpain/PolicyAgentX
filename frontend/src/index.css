@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @layer base {
   :root {
@@ -37,10 +37,22 @@
     --input: 240 6% 7%; /* #111113 */
     --ring: 239 84% 67% / 0.2;
 
+    --chart-grid: 240 6% 13%;
+    --chart-axis: 240 5% 46%;
+    --chart-tooltip-bg: 240 5% 8%;
+    --chart-tooltip-border: 240 6% 13%;
+    --chart-tooltip-text: 0 0% 100%;
+    --chart-bar-positive: 160 84% 39%;
+    --chart-line-primary: 0 0% 100%;
+    --chart-line-secondary: 239 84% 67%;
+    --chart-line-gdp: 152 76% 43%;
+    --chart-line-employment: 214 89% 62%;
+    --chart-line-sentiment: 38 92% 50%;
+
     --radius: 1rem;
 
-    --font-display: 'Inter', sans-serif;
-    --font-body: 'Inter', sans-serif;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Manrope', sans-serif;
 
     --sidebar-background: 240 7% 4%;
     --sidebar-foreground: 0 0% 100%;
@@ -50,6 +62,60 @@
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 240 6% 13%;
     --sidebar-ring: 239 84% 67%;
+  }
+
+  .light {
+    --background: 204 33% 97%;
+    --foreground: 222 44% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 44% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 44% 14%;
+
+    --primary: 214 72% 26%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 204 35% 92%;
+    --secondary-foreground: 222 44% 14%;
+
+    --muted: 204 33% 94%;
+    --muted-foreground: 218 21% 37%;
+
+    --accent: 200 92% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 210 32% 84%;
+    --input: 206 32% 92%;
+    --ring: 200 92% 42% / 0.25;
+
+    --chart-grid: 210 30% 86%;
+    --chart-axis: 218 21% 37%;
+    --chart-tooltip-bg: 0 0% 100%;
+    --chart-tooltip-border: 210 32% 84%;
+    --chart-tooltip-text: 222 44% 14%;
+    --chart-bar-positive: 164 83% 32%;
+    --chart-line-primary: 214 72% 26%;
+    --chart-line-secondary: 200 92% 42%;
+    --chart-line-gdp: 152 76% 36%;
+    --chart-line-employment: 214 89% 48%;
+    --chart-line-sentiment: 38 92% 40%;
+
+    --sidebar-background: 204 33% 97%;
+    --sidebar-foreground: 222 44% 14%;
+    --sidebar-primary: 214 72% 26%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 204 35% 92%;
+    --sidebar-accent-foreground: 222 44% 14%;
+    --sidebar-border: 210 32% 84%;
+    --sidebar-ring: 200 92% 42%;
   }
 }
 
@@ -62,6 +128,7 @@
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.35s ease, color 0.35s ease;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
@@ -129,6 +196,292 @@
 
   .bg-radial-glow {
     background: radial-gradient(circle at 50% -20%, rgba(99, 102, 241, 0.05), transparent 70%);
+  }
+
+  .app-shell-bg {
+    background:
+      radial-gradient(circle at 12% -8%, rgba(56, 189, 248, 0.11) 0%, transparent 38%),
+      radial-gradient(circle at 88% -12%, rgba(34, 197, 94, 0.08) 0%, transparent 34%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 45%, hsl(var(--secondary)) 100%);
+  }
+
+  .app-shell-noise {
+    background-image:
+      linear-gradient(120deg, rgba(255, 255, 255, 0.12) 0%, transparent 38%),
+      linear-gradient(300deg, rgba(56, 189, 248, 0.05) 0%, transparent 44%);
+    pointer-events: none;
+  }
+
+  .app-header-shell {
+    background: color-mix(in hsl, hsl(var(--background)) 82%, transparent);
+    border-color: color-mix(in hsl, hsl(var(--border)) 75%, transparent);
+  }
+
+  .nav-active-indicator {
+    box-shadow: 0 -6px 16px rgba(255, 255, 255, 0.2);
+  }
+
+  .theme-toggle {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .impact-detail-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: color-mix(in hsl, hsl(var(--border)) 70%, transparent);
+  }
+
+  .animated-card {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.04) 0%, rgba(17, 24, 39, 0.14) 100%);
+    border: 1px solid color-mix(in hsl, hsl(var(--border)) 68%, transparent);
+  }
+
+  .animated-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .animated-card::before {
+    content: "";
+    position: absolute;
+    inset: -35%;
+    z-index: 0;
+    pointer-events: none;
+    background: conic-gradient(
+      from 0deg,
+      rgba(14, 165, 233, 0.18),
+      rgba(16, 185, 129, 0.14),
+      rgba(59, 130, 246, 0.16),
+      rgba(14, 165, 233, 0.18)
+    );
+    filter: blur(24px);
+    opacity: 0.45;
+    animation: chart-glow-spin 18s linear infinite;
+  }
+
+  .chart-panel {
+    position: relative;
+    overflow: hidden;
+    background: transparent;
+  }
+
+  .chart-panel > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .chart-canvas {
+    border: 1px solid color-mix(in hsl, hsl(var(--border)) 62%, transparent);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(15, 23, 42, 0.18) 100%);
+    padding: 0.35rem;
+  }
+
+  .inner-card-surface {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid color-mix(in hsl, hsl(var(--border)) 64%, transparent);
+    border-radius: 0.9rem;
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.04) 0%, rgba(17, 24, 39, 0.18) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .inner-card-surface::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(16, 185, 129, 0.08) 50%, rgba(59, 130, 246, 0.1) 100%);
+    background-size: 220% 220%;
+    animation: chart-shift 12s ease-in-out infinite;
+    opacity: 0.55;
+  }
+
+  .inner-card-surface > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  @keyframes chart-glow-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes chart-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .light .text-gradient {
+    background: linear-gradient(118deg, #0f2f57 0%, #0d4f8c 48%, #0a79a8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .light body {
+    background:
+      radial-gradient(circle at 15% -12%, rgba(56, 189, 248, 0.2) 0%, transparent 38%),
+      radial-gradient(circle at 85% -10%, rgba(34, 197, 94, 0.12) 0%, transparent 34%),
+      hsl(var(--background));
+  }
+
+  .light .glass {
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.9) 0%, rgba(245, 251, 255, 0.94) 100%);
+    border: 1px solid rgba(173, 201, 226, 0.5);
+    box-shadow: 0 22px 38px -28px rgba(20, 55, 90, 0.4), 0 2px 0 rgba(255, 255, 255, 0.6) inset;
+    backdrop-filter: blur(8px);
+  }
+
+  .light .glow-card-hover {
+    box-shadow: 0 0 20px rgba(14, 165, 233, 0.16), 0 24px 34px -24px rgba(20, 55, 90, 0.5);
+  }
+
+  .light .bg-radial-glow {
+    background: radial-gradient(circle at 50% -20%, rgba(14, 165, 233, 0.2), transparent 68%);
+  }
+
+  .light .app-header-shell {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(243, 249, 255, 0.9) 100%);
+    border-color: rgba(160, 191, 218, 0.55);
+    box-shadow: 0 20px 30px -24px rgba(20, 55, 90, 0.45);
+    backdrop-filter: blur(12px);
+  }
+
+  .light .nav-active-indicator {
+    box-shadow: 0 -6px 16px rgba(14, 165, 233, 0.45);
+  }
+
+  .light .theme-toggle {
+    background: hsl(var(--card));
+    border-color: rgba(160, 191, 218, 0.55);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 8px 14px -14px rgba(20, 55, 90, 0.3);
+  }
+
+  .light .impact-detail-card {
+    background: linear-gradient(135deg, rgba(245, 251, 255, 0.88) 0%, rgba(230, 242, 252, 0.84) 100%);
+    border-color: rgba(157, 194, 222, 0.56);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+    background-size: 220% 220%;
+    animation: chart-shift 11s ease-in-out infinite;
+  }
+
+  .light .animated-card {
+    background: linear-gradient(130deg, rgba(252, 255, 255, 0.9) 0%, rgba(236, 247, 255, 0.92) 55%, rgba(227, 244, 255, 0.88) 100%);
+    border-color: rgba(157, 194, 222, 0.56);
+    box-shadow: 0 18px 30px -26px rgba(20, 55, 90, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    background-size: 220% 220%;
+    animation: chart-shift 11s ease-in-out infinite;
+  }
+
+  .light .animated-card::before {
+    opacity: 0.65;
+    filter: blur(26px);
+  }
+
+  .light .bg-black\/10,
+  .light .bg-black\/20,
+  .light .bg-black\/25,
+  .light .bg-black\/30 {
+    background-color: rgba(233, 244, 252, 0.72) !important;
+  }
+
+  .light .text-emerald-100,
+  .light .text-emerald-200,
+  .light .text-emerald-300,
+  .light .text-emerald-400 {
+    color: #0f766e !important;
+  }
+
+  .light .text-rose-100,
+  .light .text-rose-200,
+  .light .text-rose-300,
+  .light .text-rose-400,
+  .light .text-red-300,
+  .light .text-red-400 {
+    color: #9f1239 !important;
+  }
+
+  .light .text-cyan-300 {
+    color: #0e7490 !important;
+  }
+
+  .light .border-emerald-500\/30,
+  .light .border-rose-500\/30,
+  .light .border-red-500\/30,
+  .light .border-border\/30,
+  .light .border-border\/25 {
+    border-color: rgba(157, 194, 222, 0.6) !important;
+  }
+
+  .light .chart-panel {
+    background: transparent;
+    border-color: rgba(157, 194, 222, 0.56);
+    box-shadow: none;
+  }
+
+  .light .chart-panel::before {
+    content: none;
+  }
+
+  .light .chart-canvas {
+    border-color: rgba(157, 194, 222, 0.56);
+    background: linear-gradient(120deg, rgba(255, 255, 255, 0.82) 0%, rgba(236, 247, 255, 0.9) 55%, rgba(227, 244, 255, 0.86) 100%);
+    background-size: 220% 220%;
+    animation: chart-shift 11s ease-in-out infinite;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  .light .inner-card-surface {
+    border-color: rgba(157, 194, 222, 0.58);
+    background: linear-gradient(132deg, rgba(255, 255, 255, 0.86) 0%, rgba(239, 248, 255, 0.92) 58%, rgba(231, 245, 255, 0.88) 100%);
+    box-shadow: 0 14px 22px -20px rgba(20, 55, 90, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.86);
+    background-size: 220% 220%;
+    animation: chart-shift 11s ease-in-out infinite;
+  }
+
+  .light .inner-card-surface::before {
+    opacity: 0.72;
+  }
+
+  .light .premium-button-primary {
+    background: linear-gradient(135deg, #0f4f8a 0%, #0a79a8 100%);
+    box-shadow: 0 14px 24px -18px rgba(10, 79, 138, 0.72);
+  }
+
+  .light .premium-button-primary:hover {
+    box-shadow: 0 18px 28px -16px rgba(10, 121, 168, 0.6);
+  }
+
+  .light .premium-button-secondary {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(160, 191, 218, 0.55);
+  }
+
+  .light .premium-button-secondary:hover {
+    background: rgba(240, 248, 255, 0.95);
+  }
+
+  .light .text-white,
+  .light .hover\:text-white:hover {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .light .bg-white {
+    background-color: hsl(var(--card)) !important;
+  }
+
+  .light .text-black {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .light .shadow-black\/20,
+  .light .shadow-black\/30,
+  .light .shadow-black\/40 {
+    --tw-shadow-color: rgba(15, 23, 42, 0.18) !important;
   }
 }
 

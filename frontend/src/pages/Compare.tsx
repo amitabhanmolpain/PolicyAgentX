@@ -621,7 +621,7 @@ const ComparePage = () => {
               ? data.innovation_blocks
               : getInnovationBlocks(data?.original_policy || "", policy, metrics)
             ).map((block, idx) => (
-              <div key={`${idx}-${block.original.slice(0, 20)}`} className="rounded-xl border border-border/30 bg-black/20 p-4 space-y-2">
+              <div key={`${idx}-${block.original.slice(0, 20)}`} className="inner-card-surface animated-card rounded-xl border border-border/30 bg-black/20 p-4 space-y-2">
                 <p className="text-xs text-muted-foreground leading-relaxed"><span className="text-white font-semibold">Issue:</span> {renderInnovationText(block.original)}</p>
                 <p className="text-xs text-white leading-relaxed"><span className="font-semibold">Fix:</span> {renderInnovationText(block.upgrade)}</p>
                 <p className="text-xs text-cyan-300 leading-relaxed"><span className="font-semibold">Impact:</span> {renderInnovationText(block.why_it_wins)}</p>
@@ -632,7 +632,7 @@ const ComparePage = () => {
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground leading-relaxed">{normalizeDisplayText(toSimplePolicySummary(policy))}</p>
             {disruption.riskLevel !== "low" && (
-              <div className={`rounded-lg border p-3 ${riskBgColors[disruption.riskLevel]}`}>
+              <div className={`inner-card-surface animated-card rounded-lg border p-3 ${riskBgColors[disruption.riskLevel]}`}>
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-400" />
                   <div className="text-xs space-y-1">
@@ -843,17 +843,17 @@ const ComparePage = () => {
               const changed = hasChanged(originalSection, improvedSection);
 
               return (
-                <div key={key} className={`rounded-lg border p-4 ${changed ? "border-emerald-500/40 bg-emerald-500/5" : "border-border/30 bg-black/10"}`}>
+                <div key={key} className={`animated-card rounded-lg border p-4 ${changed ? "border-emerald-500/40 bg-emerald-500/5" : "border-border/30 bg-black/10"}`}>
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs uppercase tracking-[0.15em] font-bold text-white">{sectionTitle(key)}</p>
                     {changed && <span className="text-[10px] text-emerald-300 uppercase tracking-[0.12em]">Changed</span>}
                   </div>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    <div className="rounded-md border border-border/25 bg-black/25 p-3">
+                    <div className="inner-card-surface animated-card rounded-md border border-border/25 bg-black/25 p-3">
                       <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">Original</p>
                       <pre className="text-xs whitespace-pre-wrap break-words text-muted-foreground">{JSON.stringify(originalSection, null, 2)}</pre>
                     </div>
-                    <div className={`rounded-md border p-3 ${changed ? "border-emerald-500/30 bg-emerald-500/10" : "border-border/25 bg-black/25"}`}>
+                    <div className={`inner-card-surface animated-card rounded-md border p-3 ${changed ? "border-emerald-500/30 bg-emerald-500/10" : "border-border/25 bg-black/25"}`}>
                       <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">Improved</p>
                       <pre className={`text-xs whitespace-pre-wrap break-words ${changed ? "text-emerald-200" : "text-muted-foreground"}`}>{JSON.stringify(improvedSection, null, 2)}</pre>
                     </div>
@@ -892,53 +892,105 @@ const ComparePage = () => {
       </div>
 
       {!hideImprovedPolicy && (
-        <GlowCard hoverable={false} className="p-10 mb-12 bg-secondary/10 border-border/20">
+        <GlowCard hoverable={false} className="chart-panel p-10 mb-12 bg-secondary/10 border-border/20">
           <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-8 font-bold">Dynamic Graphs For Improved Policy</p>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="h-[280px]">
               <p className="text-xs text-muted-foreground mb-4">Improvement by metric</p>
+              <div className="chart-canvas h-[240px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={improvementChartData}>
-                  <CartesianGrid strokeDasharray="4 4" stroke="#2A2A31" />
-                  <XAxis dataKey="name" stroke="#8E8E99" fontSize={11} />
-                  <YAxis stroke="#8E8E99" fontSize={11} />
+                  <defs>
+                    <linearGradient id="cmpImprovementBarGradient" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="hsl(var(--chart-line-secondary))" stopOpacity={0.95} />
+                      <stop offset="100%" stopColor="hsl(var(--chart-bar-positive))" stopOpacity={0.94} />
+                      <animateTransform
+                        attributeName="gradientTransform"
+                        type="translate"
+                        values="-1 0;1 0;-1 0"
+                        dur="9s"
+                        repeatCount="indefinite"
+                      />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="4 4" stroke="hsl(var(--chart-grid))" />
+                  <XAxis dataKey="name" stroke="hsl(var(--chart-axis))" fontSize={11} />
+                  <YAxis stroke="hsl(var(--chart-axis))" fontSize={11} />
                   <Tooltip
                     contentStyle={{
-                      background: "#151517",
-                      border: "1px solid #2A2A31",
+                      background: "hsl(var(--chart-tooltip-bg))",
+                      border: "1px solid hsl(var(--chart-tooltip-border))",
                       borderRadius: "10px",
-                      color: "#FFFFFF",
+                      color: "hsl(var(--chart-tooltip-text))",
                       fontSize: 12,
                     }}
                     formatter={(value) => [`${value}%`, "Improvement"]}
                   />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#10b981" />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="url(#cmpImprovementBarGradient)" />
                 </BarChart>
               </ResponsiveContainer>
+              </div>
             </div>
 
             <div className="h-[280px]">
               <p className="text-xs text-muted-foreground mb-4">Original vs improved trend</p>
+              <div className="chart-canvas h-[240px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={dynamicComparisonData}>
-                  <CartesianGrid strokeDasharray="4 4" stroke="#2A2A31" />
-                  <XAxis dataKey="stage" stroke="#8E8E99" fontSize={11} />
-                  <YAxis stroke="#8E8E99" fontSize={11} />
+                  <defs>
+                    <linearGradient id="cmpLineGdpGradient" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="hsl(var(--chart-line-gdp))" stopOpacity={0.95} />
+                      <stop offset="100%" stopColor="hsl(var(--chart-bar-positive))" stopOpacity={0.95} />
+                      <animateTransform
+                        attributeName="gradientTransform"
+                        type="translate"
+                        values="-1 0;1 0;-1 0"
+                        dur="11s"
+                        repeatCount="indefinite"
+                      />
+                    </linearGradient>
+                    <linearGradient id="cmpLineEmploymentGradient" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="hsl(var(--chart-line-employment))" stopOpacity={0.95} />
+                      <stop offset="100%" stopColor="hsl(var(--chart-line-secondary))" stopOpacity={0.95} />
+                      <animateTransform
+                        attributeName="gradientTransform"
+                        type="translate"
+                        values="1 0;-1 0;1 0"
+                        dur="10s"
+                        repeatCount="indefinite"
+                      />
+                    </linearGradient>
+                    <linearGradient id="cmpLineSentimentGradient" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="hsl(var(--chart-line-sentiment))" stopOpacity={0.95} />
+                      <stop offset="100%" stopColor="hsl(var(--chart-line-secondary))" stopOpacity={0.95} />
+                      <animateTransform
+                        attributeName="gradientTransform"
+                        type="translate"
+                        values="-1 0;1 0;-1 0"
+                        dur="8s"
+                        repeatCount="indefinite"
+                      />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="4 4" stroke="hsl(var(--chart-grid))" />
+                  <XAxis dataKey="stage" stroke="hsl(var(--chart-axis))" fontSize={11} />
+                  <YAxis stroke="hsl(var(--chart-axis))" fontSize={11} />
                   <Tooltip
                     contentStyle={{
-                      background: "#151517",
-                      border: "1px solid #2A2A31",
+                      background: "hsl(var(--chart-tooltip-bg))",
+                      border: "1px solid hsl(var(--chart-tooltip-border))",
                       borderRadius: "10px",
-                      color: "#FFFFFF",
+                      color: "hsl(var(--chart-tooltip-text))",
                       fontSize: 12,
                     }}
                   />
-                  <Line type="monotone" dataKey="gdp" stroke="#34d399" strokeWidth={2} dot={{ r: 4 }} name="GDP" />
-                  <Line type="monotone" dataKey="employment" stroke="#60a5fa" strokeWidth={2} dot={{ r: 4 }} name="Employment" />
-                  <Line type="monotone" dataKey="sentiment" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} name="Sentiment" />
+                  <Line type="monotone" dataKey="gdp" stroke="url(#cmpLineGdpGradient)" strokeWidth={2.6} dot={{ r: 4 }} name="GDP" />
+                  <Line type="monotone" dataKey="employment" stroke="url(#cmpLineEmploymentGradient)" strokeWidth={2.6} dot={{ r: 4 }} name="Employment" />
+                  <Line type="monotone" dataKey="sentiment" stroke="url(#cmpLineSentimentGradient)" strokeWidth={2.6} dot={{ r: 4 }} name="Sentiment" />
                 </LineChart>
               </ResponsiveContainer>
+              </div>
             </div>
           </div>
         </GlowCard>
@@ -951,13 +1003,13 @@ const ComparePage = () => {
           <div className="space-y-4">
             <div>
               <p className="text-[9px] text-muted-foreground uppercase mb-2">Economic Impact</p>
-              <p className="text-xs text-emerald-300 leading-relaxed">
+              <p className="text-xs text-foreground leading-relaxed">
                 {normalizeDisplayText(data.original_summary || data.original_metrics.economic_impact).slice(0, 220)}
               </p>
             </div>
             <div>
               <p className="text-[9px] text-muted-foreground uppercase mb-2">Social Impact</p>
-              <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.original_metrics.social_impact).slice(0, 220)}</p>
+              <p className="text-xs text-foreground leading-relaxed">{normalizeDisplayText(data.original_metrics.social_impact).slice(0, 220)}</p>
             </div>
           </div>
         </GlowCard>
@@ -968,13 +1020,13 @@ const ComparePage = () => {
             <div className="space-y-4">
               <div>
                 <p className="text-[9px] text-muted-foreground uppercase mb-2">Economic Impact</p>
-                <p className="text-xs text-emerald-300 leading-relaxed">
+                <p className="text-xs text-foreground leading-relaxed">
                   {normalizeDisplayText(data.improved_summary || data.improved_metrics.economic_impact).slice(0, 220)}
                 </p>
               </div>
               <div>
                 <p className="text-[9px] text-muted-foreground uppercase mb-2">Social Impact</p>
-                <p className="text-xs text-emerald-300 leading-relaxed">{normalizeDisplayText(data.improved_metrics.social_impact).slice(0, 220)}</p>
+                <p className="text-xs text-foreground leading-relaxed">{normalizeDisplayText(data.improved_metrics.social_impact).slice(0, 220)}</p>
               </div>
             </div>
           </GlowCard>

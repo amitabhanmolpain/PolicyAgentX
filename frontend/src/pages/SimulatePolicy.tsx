@@ -94,7 +94,7 @@ interface Message {
   content: string;
 }
 
-const SimulatePolicyPage = () => {
+export const SimulatePolicyPage = () => {
   const [policyType, setPolicyType] = useState(policyTypes[0]);
   const [value, setValue] = useState(50);
   const [region, setRegion] = useState("India");
@@ -428,7 +428,7 @@ const SimulatePolicyPage = () => {
       if (error instanceof Error) {
         if (error.message.includes("PolicyAgentX is specifically designed for Indian")) {
           errorMessage = "⚠️ " + error.message;
-        } else if (error.message.includes("fetch")) {
+        } else if (error.message.toLowerCase().includes("fetch") || error.message.toLowerCase().includes("connect to backend")) {
           errorMessage = "Backend connection failed. Is the Flask server running on http://localhost:5000?";
         } else if (error.message.includes("JSON")) {
           errorMessage = "Backend returned invalid response. Check server logs.";
@@ -769,7 +769,7 @@ const SimulatePolicyPage = () => {
               >
                 {/* Section Header */}
                 <div className="space-y-4 px-2 md:px-0">
-                  <h2 className="text-sm font-display font-bold text-white tracking-tight">Analysis Results</h2>
+                  <h2 className="text-sm font-display font-bold text-foreground tracking-tight">Analysis Results</h2>
                   <div className="h-px bg-gradient-to-r from-border/30 to-transparent" />
                 </div>
 
@@ -788,7 +788,7 @@ const SimulatePolicyPage = () => {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: i * 0.1 }}
-                        className="p-4 rounded-xl border border-border/30 bg-secondary/30 backdrop-blur-sm"
+                        className="animated-card p-4 rounded-xl border border-border/30 bg-secondary/30 backdrop-blur-sm"
                       >
                         <p className="text-[9px] text-muted-foreground uppercase tracking-[0.1em] mb-2 font-bold">{r.label}</p>
                         <div className="mb-2">
@@ -825,7 +825,7 @@ const SimulatePolicyPage = () => {
                             const content = hasLabel ? rest.join(":").trim() : line;
 
                             return (
-                              <div key={lineIdx} className="rounded-xl border border-border/20 bg-black/20 px-3 py-2.5">
+                              <div key={lineIdx} className="inner-card-surface impact-detail-card rounded-xl border border-border/20 px-3 py-2.5">
                                 <p className="text-[10px] uppercase tracking-[0.14em] text-accent font-bold mb-1">{label}</p>
                                 <p className="text-xs text-muted-foreground leading-relaxed">{content}</p>
                               </div>
@@ -838,21 +838,41 @@ const SimulatePolicyPage = () => {
                 </GlowCard>
 
                 {/* Overall Impact Chart */}
-                <GlowCard hoverable={false} className="p-6 bg-secondary/10 border-border/20">
+                <GlowCard hoverable={false} className="chart-panel p-6 bg-secondary/10 border-border/20">
                   <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-semibold mb-4">Overall Impact Score</p>
-                  <div>
+                  <div className="chart-canvas">
                     <ResponsiveContainer width="100%" height={250}>
                       <BarChart data={getImpactChartData()}>
-                        <CartesianGrid strokeDasharray="8 8" stroke="#1F1F23" vertical={false} />
-                        <XAxis dataKey="name" stroke="#71717A" fontSize={10} tickLine={false} axisLine={false} />
-                        <YAxis stroke="#71717A" fontSize={10} tickLine={false} axisLine={false} domain={[0, 100]} />
+                        <defs>
+                          <linearGradient id="simImpactBarGradient" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="hsl(var(--chart-line-secondary))" stopOpacity={0.95} />
+                            <stop offset="45%" stopColor="hsl(var(--chart-bar-positive))" stopOpacity={0.95} />
+                            <stop offset="100%" stopColor="hsl(var(--chart-line-gdp))" stopOpacity={0.92} />
+                            <animateTransform
+                              attributeName="gradientTransform"
+                              type="translate"
+                              values="-1 0;1 0;-1 0"
+                              dur="10s"
+                              repeatCount="indefinite"
+                            />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="8 8" stroke="hsl(var(--chart-grid))" vertical={false} />
+                        <XAxis dataKey="name" stroke="hsl(var(--chart-axis))" fontSize={10} tickLine={false} axisLine={false} />
+                        <YAxis stroke="hsl(var(--chart-axis))" fontSize={10} tickLine={false} axisLine={false} domain={[0, 100]} />
                         <Tooltip 
-                          contentStyle={{ background: "#0B0B0C", border: "1px solid #1F1F23", borderRadius: "12px", fontSize: 11 }}
+                          contentStyle={{
+                            background: "hsl(var(--chart-tooltip-bg))",
+                            border: "1px solid hsl(var(--chart-tooltip-border))",
+                            borderRadius: "12px",
+                            color: "hsl(var(--chart-tooltip-text))",
+                            fontSize: 11,
+                          }}
                           formatter={(value) => [`${value}% Positive`, "Score"]}
                         />
                         <Bar 
                           dataKey="score" 
-                          fill="#10b981" 
+                          fill="url(#simImpactBarGradient)" 
                           radius={[8, 8, 0, 0]}
                           animationDuration={1000}
                         />
@@ -862,37 +882,94 @@ const SimulatePolicyPage = () => {
                 </GlowCard>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 px-2 md:px-0">
-                  <GlowCard hoverable={false} className="p-6 bg-secondary/10 border-border/20">
+                  <GlowCard hoverable={false} className="chart-panel p-6 bg-secondary/10 border-border/20">
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-semibold">Trend Forecast</p>
                       <div className="flex gap-3">
-                        <div className="flex items-center gap-1"><div className="w-1 h-1 rounded-full bg-white"/><span className="text-[8px] text-muted-foreground uppercase">GDP</span></div>
+                        <div className="flex items-center gap-1"><div className="w-1 h-1 rounded-full bg-foreground"/><span className="text-[8px] text-muted-foreground uppercase">GDP</span></div>
                         <div className="flex items-center gap-1"><div className="w-1 h-1 rounded-full bg-indigo-400"/><span className="text-[8px] text-muted-foreground uppercase">INF</span></div>
                       </div>
                     </div>
+                    <div className="chart-canvas">
                     <ResponsiveContainer width="100%" height={220}>
                       <LineChart data={getDynamicTrendData()}>
-                        <CartesianGrid strokeDasharray="8 8" stroke="#1F1F23" vertical={false} />
-                        <XAxis dataKey="month" stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dy: 8}} />
-                        <YAxis stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dx: -8}} />
-                        <Tooltip contentStyle={{ background: "#0B0B0C", border: "1px solid #1F1F23", borderRadius: "12px", fontSize: 10 }} />
-                        <Line type="monotone" dataKey="gdp" stroke="#FFFFFF" strokeWidth={2.5} dot={false} />
-                        <Line type="monotone" dataKey="inflation" stroke="#6366F1" strokeWidth={2.5} dot={false} />
+                        <defs>
+                          <linearGradient id="simGdpLineGradient" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="hsl(var(--chart-line-primary))" stopOpacity={0.95} />
+                            <stop offset="100%" stopColor="hsl(var(--chart-line-secondary))" stopOpacity={0.95} />
+                            <animateTransform
+                              attributeName="gradientTransform"
+                              type="translate"
+                              values="-1 0;1 0;-1 0"
+                              dur="9s"
+                              repeatCount="indefinite"
+                            />
+                          </linearGradient>
+                          <linearGradient id="simInfLineGradient" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="hsl(var(--chart-line-secondary))" stopOpacity={0.94} />
+                            <stop offset="100%" stopColor="hsl(var(--chart-line-employment))" stopOpacity={0.94} />
+                            <animateTransform
+                              attributeName="gradientTransform"
+                              type="translate"
+                              values="1 0;-1 0;1 0"
+                              dur="8s"
+                              repeatCount="indefinite"
+                            />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="8 8" stroke="hsl(var(--chart-grid))" vertical={false} />
+                        <XAxis dataKey="month" stroke="hsl(var(--chart-axis))" fontSize={9} tickLine={false} axisLine={false} tick={{dy: 8}} />
+                        <YAxis stroke="hsl(var(--chart-axis))" fontSize={9} tickLine={false} axisLine={false} tick={{dx: -8}} />
+                        <Tooltip
+                          contentStyle={{
+                            background: "hsl(var(--chart-tooltip-bg))",
+                            border: "1px solid hsl(var(--chart-tooltip-border))",
+                            borderRadius: "12px",
+                            color: "hsl(var(--chart-tooltip-text))",
+                            fontSize: 10,
+                          }}
+                        />
+                        <Line type="monotone" dataKey="gdp" stroke="url(#simGdpLineGradient)" strokeWidth={2.7} dot={false} />
+                        <Line type="monotone" dataKey="inflation" stroke="url(#simInfLineGradient)" strokeWidth={2.7} dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
+                    </div>
                   </GlowCard>
 
-                  <GlowCard hoverable={false} className="p-6 bg-secondary/10 border-border/20">
+                  <GlowCard hoverable={false} className="chart-panel p-6 bg-secondary/10 border-border/20">
                     <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-semibold mb-4">Impact Distribution</p>
+                    <div className="chart-canvas">
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart data={getDynamicComparisonData()}>
-                        <CartesianGrid strokeDasharray="8 8" stroke="#1F1F23" vertical={false} />
-                        <XAxis dataKey="name" stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dy: 8}} />
-                        <YAxis stroke="#71717A" fontSize={9} tickLine={false} axisLine={false} tick={{dx: -8}} />
-                        <Tooltip contentStyle={{ background: "#0B0B0C", border: "1px solid #1F1F23", borderRadius: "12px", fontSize: 10 }} />
-                        <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} barSize={35} />
+                        <defs>
+                          <linearGradient id="simDistributionBarGradient" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="hsl(var(--chart-line-secondary))" stopOpacity={0.95} />
+                            <stop offset="100%" stopColor="hsl(var(--chart-bar-positive))" stopOpacity={0.94} />
+                            <animateTransform
+                              attributeName="gradientTransform"
+                              type="rotate"
+                              values="0 0.5 0.5;360 0.5 0.5"
+                              dur="14s"
+                              repeatCount="indefinite"
+                            />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="8 8" stroke="hsl(var(--chart-grid))" vertical={false} />
+                        <XAxis dataKey="name" stroke="hsl(var(--chart-axis))" fontSize={9} tickLine={false} axisLine={false} tick={{dy: 8}} />
+                        <YAxis stroke="hsl(var(--chart-axis))" fontSize={9} tickLine={false} axisLine={false} tick={{dx: -8}} />
+                        <Tooltip
+                          contentStyle={{
+                            background: "hsl(var(--chart-tooltip-bg))",
+                            border: "1px solid hsl(var(--chart-tooltip-border))",
+                            borderRadius: "12px",
+                            color: "hsl(var(--chart-tooltip-text))",
+                            fontSize: 10,
+                          }}
+                        />
+                        <Bar dataKey="value" fill="url(#simDistributionBarGradient)" radius={[4, 4, 0, 0]} barSize={35} />
                       </BarChart>
                     </ResponsiveContainer>
+                    </div>
                   </GlowCard>
                 </div>
 

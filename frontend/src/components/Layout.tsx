@@ -9,7 +9,8 @@ const Layout = ({ children }: { children: ReactNode }) => {
   const hideFooter = location.pathname === "/simulate-policy";
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="app-shell-bg min-h-screen flex flex-col bg-background relative overflow-hidden">
+      <div className="app-shell-noise absolute inset-0 -z-10 opacity-70" />
       <Header />
       <AnimatePresence mode="wait">
         <div key={location.pathname}>

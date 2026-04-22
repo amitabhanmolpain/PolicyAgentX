@@ -26,7 +26,7 @@ const GlowCard = ({ children, className, glowColor = "blue", delay = 0, hoverabl
     whileHover={hoverable ? { y: -4 } : undefined}
     className={cn(
       "glass rounded-2xl p-8 transition-all duration-300",
-      hoverable && "hover:glow-card-hover hover:border-white/20",
+      hoverable && "hover:glow-card-hover hover:border-foreground/15",
       className
     )}
   >

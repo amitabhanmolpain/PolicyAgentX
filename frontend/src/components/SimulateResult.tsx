@@ -413,14 +413,14 @@ export default function SimulateResult({ results, loading = false }: Props) {
         <p className="text-[11px] text-muted-foreground mb-2">Who this policy is most related to and impacted.</p>
         <div className="grid grid-cols-1 gap-2">
           {affectedRows.map((item: AffectedGroupItem, idx: number) => (
-            <div key={`${item.group_name || "group"}-${idx}`} className="rounded-md border border-border/30 p-2 bg-black/20">
+            <div key={`${item.group_name || "group"}-${idx}`} className="inner-card-surface animated-card rounded-md border border-border/30 p-2 bg-black/20">
               <div className="flex justify-between gap-2 text-xs">
                 <span className="font-semibold text-white">{item.group_name}</span>
                 <span className="text-muted-foreground">{item.population_impact_percent}</span>
               </div>
               <div className="mt-1 space-y-1 text-[11px]">
                 <p className="text-muted-foreground">
-                  <span className="text-white/80 font-semibold">People:</span> {cleanText(item.estimated_population_count, inferPopulationEstimate(results?.policy_text || "", item.group_name))}
+                  <span className="text-foreground/80 font-semibold">People:</span> {cleanText(item.estimated_population_count, inferPopulationEstimate(results?.policy_text || "", item.group_name))}
                 </p>
                 <div className="flex justify-between gap-2">
                   <span className={`${statusColor(item.status)} font-semibold`}>{normalizeStatus(item.status, item.reason)}</span>
@@ -439,24 +439,24 @@ export default function SimulateResult({ results, loading = false }: Props) {
           {confidenceBadge(cards.economic_impact?.confidence_score)}
         </div>
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="rounded-lg p-3 border border-border/30 bg-black/30">
+          <div className="inner-card-surface animated-card rounded-lg p-3 border border-border/30 bg-black/30">
             <p className="text-[10px] uppercase text-muted-foreground">GDP Change</p>
             <p className={`text-lg font-bold flex items-center gap-1 ${gdpNum >= 0 ? "text-emerald-300" : "text-red-300"}`}>
               {gdpNum >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />} {cards.economic_impact?.gdp_impact_percent}
             </p>
           </div>
-          <div className="rounded-lg p-3 border border-border/30 bg-black/30">
+          <div className="inner-card-surface animated-card rounded-lg p-3 border border-border/30 bg-black/30">
             <p className="text-[10px] uppercase text-muted-foreground">Money Generated</p>
             <p className="text-lg font-bold text-emerald-300">{cards.economic_impact?.revenue_generated_inr_crores}</p>
           </div>
         </div>
         <div className="space-y-2 text-xs">
-          <p className="text-muted-foreground"><span className="text-white font-semibold">Jobs:</span> {cards.economic_impact?.employment_impact_jobs}</p>
-          <p className="text-muted-foreground"><span className="text-white font-semibold">Required Spend:</span> {cleanText(cards.economic_impact?.required_public_spend_inr, "Not estimated")}</p>
-          <p className="text-muted-foreground"><span className="text-white font-semibold">Tax Impact:</span> {cards.economic_impact?.tax_collection_impact}</p>
-          <p className="text-muted-foreground"><span className="text-white font-semibold">Money Impact:</span> {cards.economic_impact?.fiscal_deficit_impact}</p>
+          <p className="text-muted-foreground"><span className="text-foreground font-semibold">Jobs:</span> {cards.economic_impact?.employment_impact_jobs}</p>
+          <p className="text-muted-foreground"><span className="text-foreground font-semibold">Required Spend:</span> {cleanText(cards.economic_impact?.required_public_spend_inr, "Not estimated")}</p>
+          <p className="text-muted-foreground"><span className="text-foreground font-semibold">Tax Impact:</span> {cards.economic_impact?.tax_collection_impact}</p>
+          <p className="text-muted-foreground"><span className="text-foreground font-semibold">Money Impact:</span> {cards.economic_impact?.fiscal_deficit_impact}</p>
           <div className="flex items-center gap-2">
-            <span className="text-white font-semibold">Price Change:</span>
+            <span className="text-foreground font-semibold">Price Change:</span>
             <span>{cards.economic_impact?.inflation_risk}</span>
             <span className={`inline-block w-20 h-2 rounded-full ${progressClass(cards.economic_impact?.inflation_risk)}`} />
           </div>
@@ -482,7 +482,7 @@ export default function SimulateResult({ results, loading = false }: Props) {
               : financial.type;
             const moneyAmount = financial.amount || ((label === "Year 1" || label === "Year 2-3") ? "Spend amount not set" : "Money gained not set");
             return (
-              <div key={label} className="rounded-md border border-border/30 p-3 bg-black/20">
+              <div key={label} className="inner-card-surface animated-card rounded-md border border-border/30 p-3 bg-black/20">
                 <p className="text-emerald-300 font-semibold text-sm">{label}</p>
                 <p className="text-muted-foreground mt-1">{item?.immediate_effect}</p>
                 <p className="text-muted-foreground text-[11px]">Using: {item?.adoption_or_growth}</p>
@@ -504,12 +504,12 @@ export default function SimulateResult({ results, loading = false }: Props) {
           {confidenceBadge(cards.global_impact?.confidence_score)}
         </div>
         <div className="space-y-2 text-xs">
-          <p className="text-muted-foreground"><span className="text-white font-semibold">World Opinion:</span> {fdiImpact}</p>
-          <p className="text-muted-foreground"><span className="text-white font-semibold">Foreign Investment:</span> {tradeImpact}</p>
-          <p className="text-muted-foreground"><span className="text-white font-semibold">India's Position:</span> {globalPosition}</p>
-          <p className="text-muted-foreground"><span className="text-white font-semibold">vs USA/China/EU:</span> {compareGlobal}</p>
-          <p className="text-muted-foreground"><span className="text-white font-semibold">UN/World Bank:</span> {imfReaction}</p>
-          <p className="text-muted-foreground"><span className="text-white font-semibold">India Gets Better By:</span> {compScore}</p>
+          <p className="text-muted-foreground"><span className="text-foreground font-semibold">World Opinion:</span> {fdiImpact}</p>
+          <p className="text-muted-foreground"><span className="text-foreground font-semibold">Foreign Investment:</span> {tradeImpact}</p>
+          <p className="text-muted-foreground"><span className="text-foreground font-semibold">India's Position:</span> {globalPosition}</p>
+          <p className="text-muted-foreground"><span className="text-foreground font-semibold">vs USA/China/EU:</span> {compareGlobal}</p>
+          <p className="text-muted-foreground"><span className="text-foreground font-semibold">UN/World Bank:</span> {imfReaction}</p>
+          <p className="text-muted-foreground"><span className="text-foreground font-semibold">India Gets Better By:</span> {compScore}</p>
         </div>
       </GlowCard>
     ) },
@@ -539,17 +539,17 @@ export default function SimulateResult({ results, loading = false }: Props) {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
           {(cards.improvements?.three_bold_improvements || []).slice(0, 3).map((item, idx) => (
-            <div key={idx} className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-100">
+            <div key={idx} className="inner-card-surface animated-card rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-100">
               {item}
             </div>
           ))}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-          <div className="rounded-md border border-border/30 p-3 bg-black/20">
+          <div className="inner-card-surface animated-card rounded-md border border-border/30 p-3 bg-black/20">
             <p className="text-muted-foreground mb-1">Modified Policy</p>
             <p>{cards.improvements?.lower_protest_risk_modified_version}</p>
           </div>
-          <div className="rounded-md border border-border/30 p-3 bg-black/20">
+          <div className="inner-card-surface animated-card rounded-md border border-border/30 p-3 bg-black/20">
             <p className="text-muted-foreground mb-1">Phased Rollout</p>
             <p>{cards.improvements?.phased_rollout_recommendation}</p>
           </div>

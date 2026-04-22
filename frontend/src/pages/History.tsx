@@ -155,7 +155,7 @@ const HistoryPage = () => {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-[#151517] border border-[#1F1F23] rounded-2xl p-10 max-w-xl w-full shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden"
+              className="animated-card bg-[#151517] border border-[#1F1F23] rounded-2xl p-10 max-w-xl w-full shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden"
             >
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-accent/0 via-accent/50 to-accent/0 opacity-30" />
               
@@ -190,7 +190,7 @@ const HistoryPage = () => {
                   { label: "Protest Risk", value: selected.protest_risk },
                   { label: "Risk Confidence", value: selected.risk_confidence },
                 ].map((r) => (
-                  r.value && <div key={r.label} className="flex justify-between items-start py-4 border-b border-[#1F1F23]/50 last:border-0">
+                  r.value && <div key={r.label} className="animated-card flex justify-between items-start py-4 px-3 rounded-lg border border-[#1F1F23]/50 last:border-[#1F1F23]/50">
                     <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{r.label}</span>
                     <span className="font-display font-bold text-sm tracking-tighter text-emerald-400 text-right max-w-[50%]">
                       {r.value}
@@ -232,7 +232,7 @@ const HistoryPage = () => {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-[#151517] border border-destructive/20 rounded-2xl p-8 max-w-sm w-full shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+              className="animated-card bg-[#151517] border border-destructive/20 rounded-2xl p-8 max-w-sm w-full shadow-[0_0_50px_rgba(0,0,0,0.5)]"
             >
               <h3 className="font-display font-bold text-xl text-white mb-2">Delete Policy</h3>
               <p className="text-sm text-muted-foreground mb-6">Are you sure you want to delete this policy? This action cannot be undone.</p>
