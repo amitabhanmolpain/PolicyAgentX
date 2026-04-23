@@ -1,6 +1,6 @@
 # PolicyAgentX
 
-PolicyAgentX is a full-stack AI platform for policy simulation and impact analysis. It combines a Flask backend, a React frontend, Retrieval-Augmented Generation (RAG), and multi-agent orchestration to evaluate proposed policies across economic, social, business, government, and risk dimensions.
+PolicyAgentX is an AI-powered policy simulation platform that analyzes and predicts the socio-economic, demographic, and political impact of government policies using LLMs, RAG pipelines, and multi-agent systems to enable smarter, data-driven governance
 
 ## What This Project Does
 
