@@ -13,16 +13,20 @@ langgraph==1.1.4
 # Database
 pymongo==4.4.1
 
-# LangChain (COMPATIBLE SET)
+# LangChain
 langchain==1.2.14
+langchain-core
 langchain-community==0.4.1
 langchain-text-splitters==1.1.1
+langchain-groq
 
 # RAG + Embeddings
 chromadb==1.5.5
+faiss-cpu
 sentence-transformers==5.3.0
 pypdf==6.0.0
+pymupdf
 
-# Data processing
+# Data Processing
 pandas==2.2.3
 nltk==3.9.1
