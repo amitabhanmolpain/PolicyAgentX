@@ -1,4 +1,3 @@
-from langgraph.graph import StateGraph
 from typing import TypedDict
 
 from agents.economic import economic_agent
@@ -92,25 +91,18 @@ def run_recommendation(state: PolicyState) -> PolicyState:
     return state
 
 
-# Build the agent graph
-builder = StateGraph(PolicyState)
+class PolicyGraph:
+    """Minimal sequential graph wrapper that preserves graph.invoke(state)."""
 
-builder.add_node("rag", run_rag_retrieval)
-builder.add_node("economic", run_economic_analysis)
-builder.add_node("social", run_social_analysis)
-builder.add_node("business", run_business_analysis)
-builder.add_node("government", run_government_analysis)
-builder.add_node("risk", run_risk_analysis)
-builder.add_node("recommendation", run_recommendation)
+    def invoke(self, state: PolicyState) -> PolicyState:
+        state = run_rag_retrieval(state)
+        state = run_economic_analysis(state)
+        state = run_social_analysis(state)
+        state = run_business_analysis(state)
+        state = run_government_analysis(state)
+        state = run_risk_analysis(state)
+        state = run_recommendation(state)
+        return state
 
-builder.set_entry_point("rag")
 
-# All analyses run in parallel-like fashion (linear order for LangGraph)
-builder.add_edge("rag", "economic")
-builder.add_edge("economic", "social")
-builder.add_edge("social", "business")
-builder.add_edge("business", "government")
-builder.add_edge("government", "risk")
-builder.add_edge("risk", "recommendation")
-
-graph = builder.compile()
+graph = PolicyGraph()

@@ -1,20 +1,30 @@
 import json
 import os
 from pathlib import Path
+import importlib
 from typing import Any, Dict, Union
 
-import vertexai
-from vertexai.preview.generative_models import GenerativeModel
+try:
+    from google import genai as google_genai
+except ImportError:
+    google_genai = None
+
+try:
+    from google.genai import types as google_genai_types
+except ImportError:
+    google_genai_types = None
 
 # Global model instance
 _model = None
 _project_id = None
 _location = None
+_client = None
+_backend = None
 
 
 def initialize_vertex_ai():
     """Initialize Vertex AI with service account credentials"""
-    global _model, _project_id, _location
+    global _model, _client, _project_id, _location, _backend
 
     backend_dir = Path(__file__).resolve().parents[2]
     service_account_path = backend_dir / "service-account.json"
@@ -34,8 +44,22 @@ def initialize_vertex_ai():
     if not _project_id:
         raise ValueError("GCP_PROJECT_ID environment variable not set")
 
-    vertexai.init(project=_project_id, location=_location)
-    _model = GenerativeModel("gemini-2.5-flash")
+    try:
+        vertexai_module = importlib.import_module("vertexai")
+        generative_models_module = importlib.import_module("vertexai.preview.generative_models")
+        GenerativeModel = getattr(generative_models_module, "GenerativeModel")
+        vertexai_module.init(project=_project_id, location=_location)
+        _model = GenerativeModel("gemini-2.5-flash")
+        _backend = "vertexai"
+        return
+    except ImportError:
+        pass
+
+    if google_genai is None:
+        raise ImportError("Neither vertexai nor google.genai is available in this environment")
+
+    _client = google_genai.Client(vertexai=True, project=_project_id, location=_location)
+    _backend = "google_genai"
 
 
 def generate(prompt: str, temperature: float = 0.7, max_tokens: int = 2048) -> Union[str, Dict[str, str]]:
@@ -54,15 +78,28 @@ def generate(prompt: str, temperature: float = 0.7, max_tokens: int = 2048) -> U
         print("📦 Model: gemini-2.5-flash")
         print(f"📤 Sending prompt ({len(prompt)} characters)...")
 
-        response = _model.generate_content(
-            prompt,
-            generation_config={
-                "temperature": temperature,
-                "max_output_tokens": max_tokens,
-            },
-        )
+        if _backend == "vertexai" and _model is not None:
+            response = _model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": temperature,
+                    "max_output_tokens": max_tokens,
+                },
+            )
+            result_text = response.text if response.text else "No response generated"
+        else:
+            if google_genai_types is None:
+                raise ImportError("google.genai.types is unavailable")
+            response = _client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=google_genai_types.GenerateContentConfig(
+                    temperature=temperature,
+                    max_output_tokens=max_tokens,
+                ),
+            )
+            result_text = getattr(response, "text", None) or "No response generated"
 
-        result_text = response.text if response.text else "No response generated"
         print(f"✅ Response received ({len(result_text)} characters)")
         print(f"\n📝 RESPONSE PREVIEW:\n{result_text[:200]}{'...' if len(result_text) > 200 else ''}")
         print("=" * 60 + "\n")
