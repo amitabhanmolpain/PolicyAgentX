@@ -6,6 +6,7 @@ import { useTheme } from "@/components/ThemeProvider";
 
 const navItems = [
   { path: "/", label: "Home" },
+  { path: "/rag-chat", label: "RAG Chat" },
   { path: "/simulate-policy", label: "Simulate" },
   { path: "/compare", label: "Compare" },
   { path: "/history", label: "History" },

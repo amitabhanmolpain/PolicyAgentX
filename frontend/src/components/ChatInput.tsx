@@ -14,10 +14,11 @@ const placeholders = [
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
+  onUpload?: (file: File) => void;
   isLoading?: boolean;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
+const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, onUpload, isLoading }) => {
   const [value, setValue] = useState("");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
@@ -83,7 +84,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
 
         <div className="flex items-center justify-between mt-1.5 px-1">
           <div className="flex items-center gap-1">
-            <UploadButton disabled={isLoading} />
+            <UploadButton onUpload={onUpload} disabled={isLoading || !onUpload} />
             <span className="hidden sm:inline text-[9px] text-muted-foreground uppercase tracking-widest font-semibold ml-1.5">PDF Enabled</span>
           </div>
 

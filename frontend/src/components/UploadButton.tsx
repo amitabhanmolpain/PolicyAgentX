@@ -19,6 +19,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUpload, disabled }) => {
     if (file && onUpload) {
       onUpload(file);
     }
+    e.currentTarget.value = "";
   };
 
   return (

@@ -30,3 +30,4 @@ pymupdf
 # Data Processing
 pandas==2.2.3
 nltk==3.9.1
+typing_extensions

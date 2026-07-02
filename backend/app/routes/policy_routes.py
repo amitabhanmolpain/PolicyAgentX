@@ -46,7 +46,7 @@ def analyze_with_agents():
     return jsonify(result), status
 
 
-@policy_bp.route("/upload", methods=["POST"])
+@policy_bp.route("/policy-upload", methods=["POST"])
 def upload():
     file = request.files.get("file")
     result, status = handle_pdf_upload(file)
