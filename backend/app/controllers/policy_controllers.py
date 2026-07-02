@@ -284,6 +284,63 @@ def _extract_metrics_from_simulation_result(sim_result: dict) -> dict:
     }
 
 
+def _build_conflict_alert(policy_text: str, risk_score: int, rag_context: str, historical_cases) -> dict:
+    """Turn RAG-backed protest signals into a readable alert payload."""
+    context_blob = f"{rag_context or ''} {' '.join(historical_cases or [])}".lower()
+    policy_blob = (policy_text or "").lower()
+
+    conflict_terms = [
+        "protest",
+        "riot",
+        "riots",
+        "strike",
+        "bandh",
+        "agitation",
+        "demonstration",
+        "unrest",
+        "violence",
+        "clash",
+        "conflict",
+        "communal",
+        "caste",
+        "reservation",
+        "religion",
+        "land",
+        "farm",
+        "farmer",
+        "tax",
+        "subsidy",
+        "price",
+        "education",
+        "employment",
+    ]
+
+    matched_terms = sorted({term for term in conflict_terms if term in context_blob or term in policy_blob})
+    alert = risk_score >= 7 or len(matched_terms) >= 3
+
+    if risk_score >= 9:
+        level = "high"
+    elif risk_score >= 7:
+        level = "medium"
+    else:
+        level = "low"
+
+    if alert:
+        message = (
+            "RAG analysis indicates a conflict risk among people. "
+            "Historical precedents and policy semantics suggest protests, unrest, or public opposition."
+        )
+    else:
+        message = "No strong conflict signal was detected from the RAG risk analysis."
+
+    return {
+        "conflict_alert": alert,
+        "conflict_risk_level": level,
+        "conflict_alert_message": message,
+        "conflict_alert_terms": matched_terms,
+    }
+
+
 def _has_required_innovation_structure(text: str) -> bool:
     """Check if text has required 'Original:', 'Upgrade:', 'Benefit:' structure"""
     lower = (text or "").lower()
@@ -505,6 +562,10 @@ def handle_simulation(data):
         government_data = result.get("government_analysis", {})
         risk_data = result.get("risk_analysis", {})
         recommendation_data = result.get("recommendation", {})
+        rag_context = str(result.get("rag_context", ""))
+        historical_cases = result.get("historical_protest_cases", [])
+        conflict_score = int(risk_data.get("protest_risk_score", result.get("protest_risk_score", 5)))
+        conflict_alert = _build_conflict_alert(policy.text, conflict_score, rag_context, historical_cases)
 
         # Build comprehensive response
         final_result = {
@@ -520,14 +581,15 @@ def handle_simulation(data):
             "protest_risk_section": frontend_cards.get("protest_risk", {}),
             "improvements": frontend_cards.get("improvements", {}),
             "rag_source": str(result.get("rag_source", "")),
-            "rag_context": str(result.get("rag_context", "")),
-            "historical_protest_cases": result.get("historical_protest_cases", []),
+            "rag_context": rag_context,
+            "historical_protest_cases": historical_cases,
+            "protest_risk_score": conflict_score,
+            **conflict_alert,
             "economic_impact": str(economic_data.get("economic_analysis", "")),
             "social_impact": str(social_data.get("social_analysis", "")),
             "business_impact": str(business_data.get("business_analysis", "")),
             "government_impact": str(government_data.get("government_analysis", "")),
             "protest_risk": str(risk_data.get("protest_likelihood", "MEDIUM")),
-            "protest_risk_score": int(risk_data.get("protest_risk_score", result.get("protest_risk_score", 5))),
             "affected_groups": str(risk_data.get("affected_groups", "")),
             "public_reaction": str(risk_data.get("public_reaction", "")),
             "risk_confidence": str(risk_data.get("confidence_score", "75%")),

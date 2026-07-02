@@ -321,20 +321,6 @@ export const SimulatePolicyPage = () => {
       content: "🔄 Analyzing policy with AI agents..."
     };
     setMessages(prev => [...prev, thinkingMsg]);
-// Check for controversial policy
-    const isControversial = detectControversialPolicy(content);
-    setHasControversialPolicy(isControversial);
-    if (isControversial) {
-      setEmergencyAlertActive(true);
-      startEmergencyAlarm();
-
-      const alertMsg: Message = {
-        id: `emergency-${Date.now()}`,
-        role: "assistant",
-        content: "🚨 EMERGENCY ALERT: This policy appears highly sensitive and can potentially trigger social unrest or riots. Confirm understanding before proceeding."
-      };
-      setMessages(prev => prev.concat([alertMsg]));
-    }
 
     // Check if policy is explicitly for NON-India countries (default to India)
     const nonIndiaKeywords = [
@@ -409,6 +395,24 @@ export const SimulatePolicyPage = () => {
       if (result?.policy_text) {
         localStorage.setItem("policyLatestPolicyText", result.policy_text);
       }
+
+      const backendConflictAlert = Boolean(result?.conflict_alert || Number(result?.protest_risk_score ?? 0) >= 7);
+      setHasControversialPolicy(backendConflictAlert);
+      if (backendConflictAlert) {
+        setEmergencyAlertActive(true);
+        startEmergencyAlarm();
+
+        const alertMsg: Message = {
+          id: `conflict-${Date.now()}`,
+          role: "assistant",
+          content: `🚨 CONFLICT ALERT: ${result?.conflict_alert_message || "RAG analysis indicates this policy may create conflict among people."}`
+        };
+        setMessages(prev => prev.concat([alertMsg]));
+      } else {
+        setEmergencyAlertActive(false);
+        stopEmergencyAlarm();
+      }
+
       setLoading(false);
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
