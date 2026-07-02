@@ -6,7 +6,7 @@ import { useLocation } from "react-router-dom";
 
 const Layout = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
-  const hideFooter = location.pathname === "/simulate-policy" || location.pathname === "/rag-chat";
+  const hideFooter = location.pathname === "/simulate-policy";
 
   return (
     <div className="app-shell-bg min-h-screen flex flex-col bg-background relative overflow-hidden">

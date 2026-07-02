@@ -7,7 +7,6 @@ import Layout from "@/components/Layout";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Index from "./pages/Index";
 import { SimulatePolicyPage as SimulatePolicy } from "./pages/SimulatePolicy";
-import RagChat from "./pages/RagChat";
 import Compare from "./pages/Compare";
 import History from "./pages/History";
 import NotFound from "./pages/NotFound";
@@ -29,7 +28,6 @@ const App = () => (
           <Layout>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/rag-chat" element={<RagChat />} />
               <Route path="/simulate-policy" element={<SimulatePolicy />} />
               <Route path="/compare" element={<Compare />} />
               <Route path="/history" element={<History />} />

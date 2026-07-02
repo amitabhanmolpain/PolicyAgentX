@@ -29,18 +29,11 @@ const HomePage = () => (
       <p className="text-xl md:text-2xl text-secondary-foreground mb-12 font-light tracking-wide max-w-2xl mx-auto leading-relaxed">
         Simulate. Analyze. Decide. The next generation of policy intelligence.
       </p>
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-        <Link to="/rag-chat">
-          <button className="premium-button-primary text-sm tracking-widest uppercase py-4 px-10">
-            Open RAG Chat
-          </button>
-        </Link>
-        <Link to="/simulate-policy">
-          <button className="border border-border/60 bg-card/60 text-sm tracking-widest uppercase py-4 px-10 rounded-md text-foreground hover:bg-card transition-colors">
-            Open Simulation
-          </button>
-        </Link>
-      </div>
+      <Link to="/simulate-policy">
+        <button className="premium-button-primary text-sm tracking-widest uppercase py-4 px-10">
+          Open Policy Assistant
+        </button>
+      </Link>
     </motion.div>
 
     {/* Floating stats */}

@@ -160,7 +160,7 @@ const RagChatPage = () => {
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <Sparkles className="h-5 w-5 text-accent" />
-              <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">RAG Chat</h1>
+              <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">Policy Assistant</h1>
             </div>
             <p className="max-w-2xl text-sm text-muted-foreground">
               Upload a PDF, index it once in ChromaDB, then ask questions that are answered from retrieved document context through Gemini.

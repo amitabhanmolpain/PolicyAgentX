@@ -10,9 +10,9 @@ except ImportError:
     google_genai = None
 
 try:
-    from google.genai import types as google_genai_types
+    from google import genai as google_genai_types_module
 except ImportError:
-    google_genai_types = None
+    google_genai_types_module = None
 
 # Global model instance
 _model = None
@@ -28,6 +28,15 @@ def initialize_vertex_ai():
 
     backend_dir = Path(__file__).resolve().parents[2]
     service_account_path = backend_dir / "service-account.json"
+    api_key = os.getenv("GOOGLE_API_KEY")
+
+    if api_key:
+        if google_genai is None:
+            raise ImportError("google.genai is unavailable in this environment")
+        _client = google_genai.Client(api_key=api_key)
+        _backend = "google_api_key"
+        return
+
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(service_account_path)
 
     _project_id = os.getenv("GCP_PROJECT_ID")
@@ -88,8 +97,11 @@ def generate(prompt: str, temperature: float = 0.7, max_tokens: int = 2048) -> U
             )
             result_text = response.text if response.text else "No response generated"
         else:
-            if google_genai_types is None:
+            if _client is None:
+                raise RuntimeError("Gemini client is not initialized")
+            if google_genai_types_module is None:
                 raise ImportError("google.genai.types is unavailable")
+            google_genai_types = importlib.import_module("google.genai.types")
             response = _client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=prompt,
