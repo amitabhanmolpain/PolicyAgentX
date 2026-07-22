@@ -187,37 +187,6 @@ cd frontend
 npm run test
 ```
 
-## Additional Documentation
-
-- `backend/QUICKSTART.md`
-- `backend/RAG_AGENT_INTEGRATION.md`
-- `backend/RAG_PIPELINE_GUIDE.md`
-- `API_CONNECTION_FIX.md`
-
-## Common Troubleshooting
-
-### Backend cannot start
-- Verify Python virtual environment is active.
-- Ensure `pip install -r backend/requirements.txt` completed successfully.
-
-### Frontend cannot reach backend
-- Confirm backend is running on port `5000`.
-- Confirm frontend is running on port `8080`.
-- If using custom URL, set `VITE_API_URL` in frontend env.
-
-### Vertex AI errors
-- Ensure `backend/service-account.json` exists and is valid.
-- Set `GCP_PROJECT_ID` if not present in service account file.
-- Confirm the service account has Vertex AI permissions.
-
-### MongoDB connection issues
-- Ensure local MongoDB is running on `mongodb://localhost:27017/`.
-
-## Security Notes
-
-- Do not commit `.env` files with secrets.
-- Do not commit real service account credentials.
-- Rotate keys immediately if credentials are accidentally exposed.
 
 ## License
 
