@@ -777,6 +777,42 @@ export const SimulatePolicyPage = () => {
                   <div className="h-px bg-gradient-to-r from-border/30 to-transparent" />
                 </div>
 
+                {/* Visible Alert Banner Component for Conflict/Discrimination Potential */}
+                {apiResults?.risk?.is_alert && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="p-6 border-2 border-red-500/80 bg-red-950/30 backdrop-blur-md rounded-2xl shadow-[0_0_30px_rgba(255,0,0,0.25)] flex gap-4 items-start px-4 md:px-6 mx-2 md:mx-0"
+                  >
+                    <div className="p-2 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 flex-shrink-0">
+                      <AlertTriangle className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-display font-extrabold uppercase tracking-[0.16em] text-red-400 flex items-center gap-2">
+                        Conflict & Discrimination Alert
+                      </h3>
+                      <p className="text-xs text-red-200 leading-relaxed">
+                        {apiResults.risk.reasoning}
+                      </p>
+                      {apiResults.risk.affected_groups && apiResults.risk.affected_groups.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          <span className="text-[10px] text-red-300 font-bold uppercase tracking-[0.1em] self-center mr-1">
+                            Targeted / Affected:
+                          </span>
+                          {apiResults.risk.affected_groups.map((group: string, idx: number) => (
+                            <span
+                              key={idx}
+                              className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/40 text-red-200 font-semibold"
+                            >
+                              {group}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+
                 {/* Quick Impact Summary */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-2 md:px-0">
                   {apiResults && [

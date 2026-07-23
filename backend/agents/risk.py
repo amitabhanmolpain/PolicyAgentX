@@ -1,17 +1,57 @@
+import json
+import re
+import logging
 from rag.gemini_client import generate_async
 from app.services.gemini_service import response_text
 
+logger = logging.getLogger(__name__)
+
+def _parse_json_safely(text: str) -> dict:
+    """Parse JSON safely from raw LLM output, extracting from markdown code blocks if necessary."""
+    cleaned = text.strip()
+    # Remove markdown code block symbols if model wrapped output in ```json ... ```
+    match = re.search(r"```(?:json)?\s*(.*?)\s*```", cleaned, re.DOTALL)
+    if match:
+        cleaned = match.group(1).strip()
+    
+    try:
+        return json.loads(cleaned)
+    except Exception as e:
+        logger.warning(f"Failed to parse risk agent JSON output directly: {e}. Attempting manual extraction.")
+        # Fallback regex extraction of fields if the JSON was malformed
+        extracted = {}
+        for key in ["conflict_risk_score", "is_alert", "reasoning", "severity"]:
+            # Match string fields
+            str_match = re.search(rf'"{key}"\s*:\s*"([^"]*)"', cleaned)
+            if str_match:
+                extracted[key] = str_match.group(1)
+            # Match numeric fields
+            num_match = re.search(rf'"{key}"\s*:\s*(\d+)', cleaned)
+            if num_match:
+                extracted[key] = int(num_match.group(1))
+            # Match boolean fields
+            bool_match = re.search(rf'"{key}"\s*:\s*(true|false)', cleaned, re.IGNORECASE)
+            if bool_match:
+                extracted[key] = bool_match.group(1).lower() == "true"
+        
+        # Match list fields like affected_groups
+        list_match = re.search(r'"affected_groups"\s*:\s*\[(.*?)\]', cleaned, re.DOTALL)
+        if list_match:
+            group_elements = re.findall(r'"([^"]*)"', list_match.group(1))
+            extracted["affected_groups"] = group_elements
+            
+        return extracted
 
 async def risk_agent(state: dict, web_context: str = "") -> dict:
     """
-    Analyze protest risk and public reaction to policy in India
+    Analyze protest risk and public reaction to policy in India using genuine reasoning.
     
     Args:
         state: Policy state with policy_text and region
         web_context: Optional Web context from search APIs
     
     Returns:
-        Dictionary with risk assessment and protest likelihood
+        Dictionary with structured risk assessment
     """
     policy_text = state.get("policy_text", "")
     region = state.get("region", "India")
@@ -27,12 +67,11 @@ async def risk_agent(state: dict, web_context: str = "") -> dict:
             web_context = await get_cached_web_context_async(policy_text, "news_conflict")
         except Exception:
             web_context = ""
-            
-    prompt = f"""⚠️ CRITICAL: This analysis is STRICTLY FOR INDIAN GOVERNMENT POLICIES ONLY.
 
-You are a political risk analyst specializing exclusively in Indian public sentiment, social movements, and protest dynamics in India.
+    prompt = f"""You are a political risk analyst specializing exclusively in Indian public sentiment, social movements, and protest dynamics in India.
+Analyze this policy proposal:
+{policy_text}
 
-Policy: {policy_text}
 Analysis Region: India (NOT any other country - analyze ONLY Indian context)
 
 Historical Protest Context from ChromaDB (Historical PDF Retrieval):
@@ -44,126 +83,58 @@ Current News, Protests, and Public Unrest Context (Tavily):
 Historical Protest Cases:
 {historical_cases}
 
-Conduct a PROTEST RISK ANALYSIS for India. Assess the likelihood of public protests and civil unrest SPECIFICALLY in the Indian context:
+Assess the conflict and discrimination potential in India:
+1. Targeting & Discrimination: Identify whether the policy targets, restricts, or discriminates against a specific group (occupation, religion, region, caste, gender, etc.) in the Indian context.
+2. Severity: Judge the severity of this restriction: does it ban, exclude, or forcibly restrict a group's rights/livelihood, vs. merely regulate or tax them?
+3. Precedents: Cross-reference retrieved historical conflict precedents from ChromaDB and Tavily news context.
 
-1. **Likelihood of Protests in India**: What is the probability of public protests/civil unrest in India? Rate as:
-   - LOW (0-20%): Indian general public acceptance, minimal opposition in Indian context
-   - MEDIUM (20-60%): Moderate opposition from specific Indian groups, localized Indian protests possible
-   - HIGH (60-100%): High likelihood of significant Indian protests, strikes, demonstrations across India
-   
-   Justify your rating with specific reasoning about Indian public sentiment.
+Return a valid JSON object ONLY. Do not include any markdown styling, explanations, introduction, or formatting outside the JSON object.
+JSON structure:
+{{
+  "conflict_risk_score": <integer between 0 and 100>,
+  "is_alert": <boolean true or false>,
+  "affected_groups": [<list of specific targeted groups, e.g. "Farmers", "General Category">],
+  "reasoning": "<A concise explanation of the risk, targeting, and severity in the Indian context. Mention relevant historical or news context if applicable.>",
+  "severity": "<"low" or "moderate" or "high" or "severe">"
+}}
 
-2. **Affected Population Groups in India**: Which specific Indian groups will be most negatively affected?
-   - Specific Indian income brackets (impact in Indian rupees/percentages)
-   - Which Indian states/cities will be most affected
-   - Which Indian industries/occupations most impacted
-   - Indian social groups (Indian farmers, Indian workers, Indian students, etc.)
-   - Estimate percentage of Indian population affected
-   - Intensity of impact on each group in the Indian context
+Note: Set "is_alert" to true if the severity is "high" or "severe" (such as outright bans or restrictions targeting specific groups)."""
 
-3. **Public Reaction in India**: 
-   - Historical precedent in India: Past Indian protests (fuel price protests, farm protests, quota protests, etc.)
-   - Emotional triggers for Indian population: What will anger Indians? Past Indian grievances?
-   - How Indian media will frame this politically
-   - Indian social media amplification risk through Indian platforms
-   - Indian opposition party response potential
-   - Reference actual Indian social movements and Indian protest history
-
-4. **Confidence Score**: How confident are you in this assessment for India? (70-95% confidence based on Indian political precedent)
-
-5. **Protest Risk Score (1-10)**:
-     - Use 1 for very low protest risk and 10 for extreme protest risk.
-     - Baseline from retrieval heuristic: {baseline_score}
-
-Be extremely specific with examples from INDIAN history ONLY. Extract only Indian precedents.
-
-Format your response as:
-PROTEST_LIKELIHOOD: [LOW/MEDIUM/HIGH with Indian context and percentage]
-AFFECTED_GROUPS: [specific Indian groups, percentages, affected Indian states]
-PUBLIC_REACTION: [emotional triggers for Indians, Indian historical parallels, Indian media narrative]
-CONFIDENCE_SCORE: [percentage confidence in Indian context]
-PROTEST_RISK_SCORE: [integer 1-10]"""
-
-    response = response_text(await generate_async(prompt, temperature=0.8, max_tokens=2500))
+    raw_response = response_text(await generate_async(prompt, temperature=0.2, max_tokens=2048))
+    
+    parsed_res = _parse_json_safely(raw_response)
+    
+    # Extract individual fields with robust fallbacks
+    risk_score = parsed_res.get("conflict_risk_score", baseline_score * 10)
+    # Map scale 1-10 to 0-100 if score is extremely low
+    if risk_score <= 10 and risk_score > 0:
+        risk_score *= 10
+        
+    severity = str(parsed_res.get("severity", "moderate")).lower()
+    if severity not in ["low", "moderate", "high", "severe"]:
+        severity = "moderate"
+        
+    # Programmatic enforcement of is_alert for high/severe cases
+    is_alert = parsed_res.get("is_alert", False)
+    if severity in ["high", "severe"]:
+        is_alert = True
+        
+    affected_groups = parsed_res.get("affected_groups", [])
+    if not isinstance(affected_groups, list):
+        affected_groups = [str(affected_groups)]
+        
+    reasoning = parsed_res.get("reasoning", "No explanation available")
     
     result = {
-        "risk_analysis": response,
-        "protest_likelihood": _extract_protest_level(response),
-        "protest_risk_score": _extract_risk_score(response, baseline_score),
-        "affected_groups": _extract_section(response, "AFFECTED_GROUPS"),
-        "public_reaction": _extract_section(response, "PUBLIC_REACTION"),
-        "confidence_score": _extract_confidence(response),
+        "conflict_risk_score": risk_score,
+        "is_alert": is_alert,
+        "affected_groups": affected_groups,
+        "reasoning": reasoning,
+        "severity": severity,
+        # Maintain backward compatibility fields for any legacy graph checks
+        "protest_likelihood": "HIGH" if severity in ["high", "severe"] else "MEDIUM" if severity == "moderate" else "LOW",
+        "protest_risk_score": max(1, min(10, int(risk_score / 10))),
+        "public_reaction": reasoning
     }
     
     return result
-
-
-def _extract_protest_level(text: str) -> str:
-    """Extract protest likelihood level"""
-    try:
-        start = text.find("PROTEST_LIKELIHOOD:")
-        if start == -1:
-            return "MEDIUM"
-        start += len("PROTEST_LIKELIHOOD:") + 1
-        end = text.find("\n", start)
-        if end == -1:
-            end = len(text)
-        content = text[start:end].strip()
-        
-        if "HIGH" in content.upper():
-            return "HIGH"
-        elif "LOW" in content.upper():
-            return "LOW"
-        else:
-            return "MEDIUM"
-    except:
-        return "MEDIUM"
-
-
-def _extract_confidence(text: str) -> str:
-    """Extract confidence score"""
-    try:
-        start = text.find("CONFIDENCE_SCORE:")
-        if start == -1:
-            return "75%"
-        start += len("CONFIDENCE_SCORE:") + 1
-        end = text.find("\n", start)
-        if end == -1:
-            end = len(text)
-        return text[start:end].strip()
-    except:
-        return "75%"
-
-
-def _extract_risk_score(text: str, fallback: int) -> int:
-    """Extract numeric protest risk score from model response."""
-    try:
-        start = text.find("PROTEST_RISK_SCORE:")
-        if start == -1:
-            return max(1, min(10, fallback))
-        start += len("PROTEST_RISK_SCORE:") + 1
-        end = text.find("\n", start)
-        if end == -1:
-            end = len(text)
-        raw = text[start:end].strip()
-        digits = "".join(ch for ch in raw if ch.isdigit())
-        if not digits:
-            return max(1, min(10, fallback))
-        return max(1, min(10, int(digits[:2])))
-    except:
-        return max(1, min(10, fallback))
-
-
-def _extract_section(text: str, section: str) -> str:
-    """Extract a section from response text"""
-    try:
-        start = text.find(f"{section}:")
-        if start == -1:
-            return ""
-        start += len(f"{section}:") + 1
-        end = text.find("\n", start)
-        if end == -1:
-            end = len(text)
-        return text[start:end].strip()
-    except:
-        return ""

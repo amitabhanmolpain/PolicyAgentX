@@ -634,6 +634,8 @@ def handle_simulation(data):
             "historical_protest_cases": historical_cases,
             "protest_risk_score": conflict_score,
             **conflict_alert,
+            "risk": risk_data,
+            "conflict_alert": risk_data,
             "economic_impact": economic_impact_str,
             "social_impact": social_impact_str,
             "business_impact": business_impact_str,

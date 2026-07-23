@@ -27,6 +27,7 @@ class AgentContext:
     business_impact: Dict[str, Any] = None
     risk_factors: List[str] = None
     government_coordination: Dict[str, Any] = None
+    risk_analysis: Dict[str, Any] = None
 
 
 class RAGAgentOrchestrator:
@@ -161,9 +162,24 @@ class RAGAgentOrchestrator:
         # Risk assessment runs after demographic/financial analysis completes
         print("\n⚠️  Step 4: Running Risk Assessment Agent...")
         try:
-            agent_context.risk_factors = await self._run_risk_agent(agent_context, web_contexts)
+            risk_res = await self._run_risk_agent(agent_context, web_contexts)
+            agent_context.risk_analysis = risk_res
+            
+            # Map factors for backward compatibility
+            risk_factors = []
+            risk_factors.append(f"🔥 Protest Likelihood (Tavily): {risk_res.get('protest_likelihood', 'MEDIUM')}")
+            risk_factors.append(f"📈 Protest Risk Score: {risk_res.get('protest_risk_score', 5)}/10")
+            risk_factors.append(f"👥 Affected Groups: {', '.join(risk_res.get('affected_groups', []))[:100]}...")
+            agent_context.risk_factors = risk_factors
         except Exception as e:
             print(f"Error in Risk Agent: {e}")
+            agent_context.risk_analysis = {
+                "conflict_risk_score": 50,
+                "is_alert": False,
+                "affected_groups": [],
+                "reasoning": f"Risk assessment failed: {e}",
+                "severity": "moderate"
+            }
             agent_context.risk_factors = [f"Risk assessment failed: {e}"]
         
         # Step 9: Compile final report
@@ -341,30 +357,10 @@ class RAGAgentOrchestrator:
         except Exception as e:
             return {"error": f"Business analysis failed: {e}"}
     
-    async def _run_risk_agent(self, context: AgentContext, web_contexts: dict) -> List[str]:
+    async def _run_risk_agent(self, context: AgentContext, web_contexts: dict) -> Dict[str, Any]:
         """Risk agent identifies potential risks and mitigation strategies"""
         
         try:
-            risk_factors = []
-            
-            # Check for known risk patterns
-            risk_patterns = {
-                "implementation_risk": ["complex", "distributed", "coordination"],
-                "compliance_risk": ["mandate", "requirement", "regulation"],
-                "economic_risk": ["inflation", "deficit", "unemployment"],
-                "social_risk": ["inequality", "disparity", "exclusion"],
-                "political_risk": ["controversial", "partisan", "election"]
-            }
-            
-            policy_lower = context.policy_description.lower()
-            for risk_type, keywords in risk_patterns.items():
-                if any(keyword in policy_lower for keyword in keywords):
-                    risk_factors.append(f"⚠️ {risk_type.replace('_', ' ').title()}: Potential issues detected")
-            
-            # Add RAG-based risk factors
-            if context.rag_context.get("economic_context"):
-                risk_factors.append("📊 Economic volatility: Current baseline shows market fluctuations")
-                
             from agents.risk import risk_agent
             state = {
                 "policy_text": context.policy_description,
@@ -374,15 +370,16 @@ class RAGAgentOrchestrator:
                 "protest_risk_score": 5
             }
             agent_res = await risk_agent(state, web_context=web_contexts.get("news_conflict", ""))
-            
-            if agent_res:
-                risk_factors.append(f"🔥 Protest Likelihood (Tavily): {agent_res.get('protest_likelihood', 'MEDIUM')}")
-                risk_factors.append(f"📈 Protest Risk Score: {agent_res.get('protest_risk_score', 5)}/10")
-                risk_factors.append(f"👥 Affected Groups: {agent_res.get('affected_groups', '')[:100]}...")
-            
-            return risk_factors if risk_factors else ["✓ Low risk profile"]
+            return agent_res
         except Exception as e:
-            return [f"Error: {e}"]
+            print(f"Error in _run_risk_agent: {e}")
+            return {
+                "conflict_risk_score": 50,
+                "is_alert": False,
+                "affected_groups": [],
+                "reasoning": f"Risk assessment execution failed: {e}",
+                "severity": "moderate"
+            }
     
     async def _run_government_agent(self, context: AgentContext, web_contexts: dict) -> Dict[str, Any]:
         """Government coordination agent identifies stakeholders and alignment"""
@@ -437,6 +434,8 @@ class RAGAgentOrchestrator:
                 "identified_risks": context.risk_factors or [],
                 "overall_risk_level": "Low" if len([r for r in (context.risk_factors or []) if "Error" not in r]) < 3 else "Medium"
             },
+            "risk": context.risk_analysis,
+            "conflict_alert": context.risk_analysis,
             "government_coordination": context.government_coordination,
             "execution_summary": self._generate_execution_summary(context)
         }
