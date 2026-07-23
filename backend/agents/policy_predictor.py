@@ -19,6 +19,28 @@ import asyncio
 from rag.gemini_client import generate_async
 from app.services.gemini_service import response_text
 
+def safe_float(val, default=0.0) -> float:
+    if val is None:
+        return default
+    if isinstance(val, (int, float)):
+        return float(val)
+    try:
+        cleaned = str(val).replace("%", "").replace(",", "").strip()
+        return float(cleaned)
+    except (ValueError, TypeError):
+        return default
+
+def safe_int(val, default=0) -> int:
+    if val is None:
+        return default
+    if isinstance(val, (int, float)):
+        return int(val)
+    try:
+        cleaned = str(val).replace("%", "").replace(",", "").strip()
+        return int(float(cleaned))
+    except (ValueError, TypeError):
+        return default
+
 
 # ─────────────────────────────────────────────
 # DATA STRUCTURES
@@ -135,16 +157,17 @@ IMPORTANT:
         text = response_text(response)
         impact_data = self._parse_json_response(text)
         
-        revenue = impact_data.get("estimated_revenue_crores", 0)
-        loss = impact_data.get("estimated_loss_crores", 0)
-        net = revenue - loss - impact_data.get("implementation_cost_crores", 0)
+        revenue = safe_float(impact_data.get("estimated_revenue_crores"))
+        loss = safe_float(impact_data.get("estimated_loss_crores"))
+        impl_cost = safe_float(impact_data.get("implementation_cost_crores"))
+        net = revenue - loss - impl_cost
         
         return FinancialImpact(
             estimated_revenue_crores=revenue,
-            revenue_per_capita=impact_data.get("revenue_per_capita_rupees", 0),
-            implementation_cost=impact_data.get("implementation_cost_crores", 0),
+            revenue_per_capita=safe_float(impact_data.get("revenue_per_capita_rupees")),
+            implementation_cost=impl_cost,
             net_impact=net,
-            confidence_level=int(impact_data.get("confidence_level", 50)),
+            confidence_level=safe_int(impact_data.get("confidence_level"), 50),
             assumptions=impact_data.get("key_assumptions", [])
         )
     
@@ -208,9 +231,9 @@ Focus on:
         return DemographicImpact(
             income_class=income_class,
             population_affected=population,
-            beneficiaries_percent=float(impact_data.get("beneficiaries_percent", 0)),
-            sufferers_percent=float(impact_data.get("sufferers_percent", 0)),
-            net_benefit_per_person=float(impact_data.get("net_benefit_per_person_rupees", 0)),
+            beneficiaries_percent=safe_float(impact_data.get("beneficiaries_percent")),
+            sufferers_percent=safe_float(impact_data.get("sufferers_percent")),
+            net_benefit_per_person=safe_float(impact_data.get("net_benefit_per_person_rupees")),
             key_impacts=impact_data.get("key_positive_impacts", []) + 
                        [f"NEGATIVE: {x}" for x in impact_data.get("key_negative_impacts", [])]
         )
@@ -263,11 +286,11 @@ Assume implementation starting Year 1 at 70% effectiveness, reaching 95% by Year
         projections = []
         for proj in projections_data:
             projections.append(FutureProjection(
-                year=int(proj.get("year", 2025)),
-                gdp_impact_percent=float(proj.get("gdp_impact_percent", 0)),
-                employment_jobs_gained=int(proj.get("employment_jobs_gained", 0)),
-                inflation_impact=float(proj.get("inflation_impact_percent", 0)),
-                tax_revenue_impact_crores=float(proj.get("tax_revenue_impact_crores", 0))
+                year=safe_int(proj.get("year"), 2025),
+                gdp_impact_percent=safe_float(proj.get("gdp_impact_percent")),
+                employment_jobs_gained=safe_int(proj.get("employment_jobs_gained")),
+                inflation_impact=safe_float(proj.get("inflation_impact_percent")),
+                tax_revenue_impact_crores=safe_float(proj.get("tax_revenue_impact_crores"))
             ))
         
         return projections

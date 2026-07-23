@@ -50,7 +50,7 @@ def generate(prompt: str, temperature: float = 0.7, max_tokens: int = 2048) -> U
             initialize_vertex_ai()
         print("✅ Gemini client initialized successfully")
 
-        print("📦 Model: gemini-2.5-flash")
+        print("📦 Model: gemini-3.5-flash-lite")
         print(f"📤 Sending prompt ({len(prompt)} characters)...")
 
         if _client is None:
@@ -59,7 +59,7 @@ def generate(prompt: str, temperature: float = 0.7, max_tokens: int = 2048) -> U
             raise ImportError("google.genai.types is unavailable")
         google_genai_types = importlib.import_module("google.genai.types")
         response = _client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.5-flash-lite",
             contents=prompt,
             config=google_genai_types.GenerateContentConfig(
                 temperature=temperature,
