@@ -44,7 +44,7 @@ def get_prompt_hash(prompt: str) -> str:
 
 def generate(
     prompt: str, 
-    model: str = "gemini-2.0-flash-lite", 
+    model: str = "gemini-flash-latest", 
     temperature: float = None, 
     max_tokens: int = None
 ) -> str:
@@ -102,7 +102,7 @@ def generate(
 
 async def generate_async(
     prompt: str, 
-    model: str = "gemini-2.0-flash-lite", 
+    model: str = "gemini-flash-latest", 
     temperature: float = None, 
     max_tokens: int = None
 ) -> str:
