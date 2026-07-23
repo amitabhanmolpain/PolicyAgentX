@@ -42,11 +42,28 @@ def initialize_state(policy_text: str, region: str = "India") -> PolicyState:
     }
 
 
+def run_async_in_sync(coro):
+    """Run an async coroutine inside a synchronous execution context."""
+    import asyncio
+    import concurrent.futures
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+        
+    if loop is not None and loop.is_running():
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(lambda: asyncio.run(coro))
+            return future.result()
+    else:
+        return asyncio.run(coro)
+
+
 def run_economic_analysis(state: PolicyState) -> PolicyState:
     """Run economic agent and update state"""
     from rag.tavily_client import get_cached_web_context
     web_context = get_cached_web_context(state.get("policy_text", ""), "economic")
-    result = economic_agent(state, web_context=web_context)
+    result = run_async_in_sync(economic_agent(state, web_context=web_context))
     state["economic_analysis"] = result
     return state
 
@@ -62,7 +79,7 @@ def run_social_analysis(state: PolicyState) -> PolicyState:
     """Run social agent and update state"""
     from rag.tavily_client import get_cached_web_context
     web_context = get_cached_web_context(state.get("policy_text", ""), "news_conflict")
-    result = social_agent(state, web_context=web_context)
+    result = run_async_in_sync(social_agent(state, web_context=web_context))
     state["social_analysis"] = result
     return state
 
@@ -71,7 +88,7 @@ def run_business_analysis(state: PolicyState) -> PolicyState:
     """Run business agent and update state"""
     from rag.tavily_client import get_cached_web_context
     web_context = get_cached_web_context(state.get("policy_text", ""), "general")
-    result = business_agent(state, web_context=web_context)
+    result = run_async_in_sync(business_agent(state, web_context=web_context))
     state["business_analysis"] = result
     return state
 
@@ -80,7 +97,7 @@ def run_government_analysis(state: PolicyState) -> PolicyState:
     """Run government agent and update state"""
     from rag.tavily_client import get_cached_web_context
     web_context = get_cached_web_context(state.get("policy_text", ""), "government")
-    result = government_agent(state, web_context=web_context)
+    result = run_async_in_sync(government_agent(state, web_context=web_context))
     state["government_analysis"] = result
     return state
 
@@ -89,7 +106,7 @@ def run_risk_analysis(state: PolicyState) -> PolicyState:
     """Run risk agent and update state"""
     from rag.tavily_client import get_cached_web_context
     web_context = get_cached_web_context(state.get("policy_text", ""), "news_conflict")
-    result = risk_agent(state, web_context=web_context)
+    result = run_async_in_sync(risk_agent(state, web_context=web_context))
     state["risk_analysis"] = result
     return state
 
@@ -98,7 +115,7 @@ def run_recommendation(state: PolicyState) -> PolicyState:
     """Run recommendation agent and update state"""
     from rag.tavily_client import get_cached_web_context
     web_context = get_cached_web_context(state.get("policy_text", ""), "general")
-    result = recommend_policy(state, web_context=web_context)
+    result = run_async_in_sync(recommend_policy(state, web_context=web_context))
     state["recommendation"] = result
     return state
 

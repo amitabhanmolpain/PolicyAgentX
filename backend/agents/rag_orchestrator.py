@@ -16,7 +16,8 @@ from langgraph.graph import StateGraph, START, END
 
 from rag.policy_rag_retriever import PolicyRAGRetriever
 from agents.policy_predictor import PolicyPredictionEngine
-from app.services.gemini_service import generate, response_text
+from rag.gemini_client import generate
+from app.services.gemini_service import response_text
 
 
 @dataclass
