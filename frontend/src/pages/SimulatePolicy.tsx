@@ -396,7 +396,12 @@ export const SimulatePolicyPage = () => {
         localStorage.setItem("policyLatestPolicyText", result.policy_text);
       }
 
-      const backendConflictAlert = Boolean(result?.conflict_alert || Number(result?.protest_risk_score ?? 0) >= 7);
+      const backendConflictAlert = Boolean(
+        result?.is_alert ||
+        (result?.conflict_alert && typeof result.conflict_alert === "object"
+          ? result.conflict_alert.is_alert
+          : result?.conflict_alert)
+      );
       setHasControversialPolicy(backendConflictAlert);
       if (backendConflictAlert) {
         setEmergencyAlertActive(true);

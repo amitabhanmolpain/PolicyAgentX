@@ -281,60 +281,34 @@ def _extract_metrics_from_simulation_result(sim_result: dict) -> dict:
     }
 
 
-def _build_conflict_alert(policy_text: str, risk_score: int, rag_context: str, historical_cases) -> dict:
-    """Turn RAG-backed protest signals into a readable alert payload."""
+def _build_conflict_alert(policy_text: str, risk_score: int, rag_context: str, historical_cases, risk_data: dict = None) -> dict:
+    """Turn RAG-backed protest signals into a readable alert payload using genuine LLM reasoning."""
     context_blob = f"{rag_context or ''} {' '.join(historical_cases or [])}".lower()
     policy_blob = (policy_text or "").lower()
 
-    conflict_terms = [
-        "protest",
-        "riot",
-        "riots",
-        "strike",
-        "bandh",
-        "agitation",
-        "demonstration",
-        "unrest",
-        "violence",
-        "clash",
-        "conflict",
-        "communal",
-        "caste",
-        "reservation",
-        "religion",
-        "land",
-        "farm",
-        "farmer",
-        "tax",
-        "subsidy",
-        "price",
-        "education",
-        "employment",
-    ]
-
-    matched_terms = sorted({term for term in conflict_terms if term in context_blob or term in policy_blob})
-    alert = risk_score >= 7 or len(matched_terms) >= 3
-
-    if risk_score >= 9:
-        level = "high"
-    elif risk_score >= 7:
-        level = "medium"
+    # Use genuine LLM reasoning from risk_data if available
+    if risk_data and isinstance(risk_data, dict) and "is_alert" in risk_data:
+        alert = bool(risk_data.get("is_alert", False))
     else:
-        level = "low"
+        # Fallback keyword matching for extreme language
+        severe_terms = ["ban all", "expel all", "restrict all", "discriminate against"]
+        alert = risk_score >= 8 or any(x in policy_blob for x in severe_terms)
 
     if alert:
         message = (
-            "RAG analysis indicates a conflict risk among people. "
+            "RAG analysis indicates a conflict risk among groups. "
             "Historical precedents and policy semantics suggest protests, unrest, or public opposition."
         )
+        level = "high"
     else:
         message = "No strong conflict signal was detected from the RAG risk analysis."
+        level = "low"
 
     return {
         "conflict_alert": alert,
         "conflict_risk_level": level,
         "conflict_alert_message": message,
-        "conflict_alert_terms": matched_terms,
+        "conflict_alert_terms": [],
     }
 
 
@@ -561,8 +535,8 @@ def handle_simulation(data):
         recommendation_data = result.get("recommendation", {})
         rag_context = str(result.get("rag_context", ""))
         historical_cases = result.get("historical_protest_cases", [])
-        conflict_score = int(risk_data.get("protest_risk_score", result.get("protest_risk_score", 5)))
-        conflict_alert = _build_conflict_alert(policy.text, conflict_score, rag_context, historical_cases)
+        conflict_score = int(risk_data.get("conflict_risk_score", risk_data.get("protest_risk_score", result.get("protest_risk_score", 5))))
+        conflict_alert = _build_conflict_alert(policy.text, conflict_score, rag_context, historical_cases, risk_data)
 
         # Fallbacks if Gemini model API quota is exhausted
         is_negative = any(x in policy.text.lower() for x in ["ban", "restrict", "exclude", "limit", "oppose", "protest"])
@@ -645,6 +619,7 @@ def handle_simulation(data):
             "historical_protest_cases": historical_cases,
             "protest_risk_score": conflict_score,
             **conflict_alert,
+            "is_alert": conflict_alert.get("conflict_alert", False),
             "risk": risk_data,
             "conflict_alert": risk_data,
             "economic_impact": economic_impact_str,
