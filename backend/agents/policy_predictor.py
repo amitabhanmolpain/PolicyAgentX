@@ -15,8 +15,7 @@ import json
 import os
 from pathlib import Path
 
-import vertexai
-from vertexai.preview.generative_models import GenerativeModel
+from app.services.gemini_service import generate, response_text
 
 
 # ─────────────────────────────────────────────
@@ -84,30 +83,7 @@ class PolicyPredictionEngine:
         self.india_gdp_trillions = 3.5
 
     def _ensure_model(self):
-        if self.model is not None:
-            return self.model
-
-        backend_dir = Path(__file__).resolve().parents[1]
-        service_account_path = backend_dir / "service-account.json"
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(service_account_path)
-
-        self._project_id = os.getenv("GCP_PROJECT_ID")
-        self._location = os.getenv("GCP_LOCATION", "us-central1")
-
-        if not self._project_id and service_account_path.exists():
-            try:
-                with service_account_path.open("r", encoding="utf-8") as handle:
-                    service_data = json.load(handle)
-                self._project_id = service_data.get("project_id")
-            except Exception:
-                self._project_id = None
-
-        if not self._project_id:
-            raise ValueError("GCP_PROJECT_ID environment variable not set")
-
-        vertexai.init(project=self._project_id, location=self._location)
-        self.model = GenerativeModel("gemini-2.5-flash")
-        return self.model
+        pass
     
     def predict_financial_impact(self, policy_text: str, 
                                 historical_context: str = "",
@@ -153,8 +129,9 @@ IMPORTANT:
 - Assume 5% effective policy implementation rate (India avg)
 """
         
-        response = self._ensure_model().generate_content(prompt)
-        impact_data = self._parse_json_response(response.text)
+        response = generate(prompt)
+        text = response_text(response)
+        impact_data = self._parse_json_response(text)
         
         revenue = impact_data.get("estimated_revenue_crores", 0)
         loss = impact_data.get("estimated_loss_crores", 0)
@@ -222,8 +199,9 @@ Focus on:
 - Access to services
 - Savings capacity """
         
-        response = self._ensure_model().generate_content(prompt)
-        impact_data = self._parse_json_response(response.text)
+        response = generate(prompt)
+        text = response_text(response)
+        impact_data = self._parse_json_response(text)
         
         return DemographicImpact(
             income_class=income_class,
@@ -276,8 +254,9 @@ Consider:
 
 Assume implementation starting Year 1 at 70% effectiveness, reaching 95% by Year 3."""
         
-        response = self._ensure_model().generate_content(prompt)
-        projections_data = self._parse_json_array(response.text)
+        response = generate(prompt)
+        text = response_text(response)
+        projections_data = self._parse_json_array(text)
         
         projections = []
         for proj in projections_data:
