@@ -8,6 +8,22 @@ import re
 from datetime import datetime
 import os
 
+def run_async_in_sync(coro):
+    import asyncio
+    import concurrent.futures
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+        
+    if loop is not None and loop.is_running():
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(lambda: asyncio.run(coro))
+            return future.result()
+    else:
+        return asyncio.run(coro)
+
+
 # RAG Pipeline (optional, will load if available)
 RAG_AVAILABLE = False
 try:
@@ -816,7 +832,7 @@ def handle_orchestrated_analysis(data):
         orchestrator = RAGAgentOrchestrator()
         
         # Run comprehensive analysis
-        analysis_result = orchestrator.orchestrate_policy_analysis(policy_text)
+        analysis_result = run_async_in_sync(orchestrator.orchestrate_policy_analysis(policy_text))
         
         # Format response
         result = {

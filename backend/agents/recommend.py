@@ -1,7 +1,8 @@
-from app.services.gemini_service import generate, response_text
+from rag.gemini_client import generate_async
+from app.services.gemini_service import response_text
 
 
-def recommend_policy(state: dict, web_context: str = "") -> dict:
+async def recommend_policy(state: dict, web_context: str = "") -> dict:
     """
     Generate optimized policy recommendations based on analysis
     
@@ -21,8 +22,8 @@ def recommend_policy(state: dict, web_context: str = "") -> dict:
         web_context = state.get("web_contexts", {}).get("general", "")
     if not web_context:
         try:
-            from rag.tavily_client import get_cached_web_context
-            web_context = get_cached_web_context(policy_text, "general")
+            from rag.tavily_client import get_cached_web_context_async
+            web_context = await get_cached_web_context_async(policy_text, "general")
         except Exception:
             web_context = ""
             
@@ -75,7 +76,7 @@ OPTIMIZED_POLICY: [detailed policy proposal for India]
 WHY_BETTER: [comparative analysis for India with specific metrics]
 IMPLEMENTATION: [phasing for India, Indian pilot regions, Indian support mechanisms, timeline]"""
 
-    response = response_text(generate(prompt, temperature=0.7, max_tokens=2500))
+    response = response_text(await generate_async(prompt, temperature=0.7, max_tokens=2500))
     
     result = {
         "recommendation_analysis": response,

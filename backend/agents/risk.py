@@ -1,7 +1,8 @@
-from app.services.gemini_service import generate, response_text
+from rag.gemini_client import generate_async
+from app.services.gemini_service import response_text
 
 
-def risk_agent(state: dict, web_context: str = "") -> dict:
+async def risk_agent(state: dict, web_context: str = "") -> dict:
     """
     Analyze protest risk and public reaction to policy in India
     
@@ -22,8 +23,8 @@ def risk_agent(state: dict, web_context: str = "") -> dict:
         web_context = state.get("web_contexts", {}).get("news_conflict", "")
     if not web_context:
         try:
-            from rag.tavily_client import get_cached_web_context
-            web_context = get_cached_web_context(policy_text, "news_conflict")
+            from rag.tavily_client import get_cached_web_context_async
+            web_context = await get_cached_web_context_async(policy_text, "news_conflict")
         except Exception:
             web_context = ""
             
@@ -83,7 +84,7 @@ PUBLIC_REACTION: [emotional triggers for Indians, Indian historical parallels, I
 CONFIDENCE_SCORE: [percentage confidence in Indian context]
 PROTEST_RISK_SCORE: [integer 1-10]"""
 
-    response = response_text(generate(prompt, temperature=0.8, max_tokens=2500))
+    response = response_text(await generate_async(prompt, temperature=0.8, max_tokens=2500))
     
     result = {
         "risk_analysis": response,

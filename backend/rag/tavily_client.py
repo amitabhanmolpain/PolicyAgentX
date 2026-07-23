@@ -38,7 +38,7 @@ def get_policy_hash(policy_text: str) -> str:
 
 def fetch_web_context(
     query: str,
-    max_tokens: int = 1500,
+    max_tokens: int = 600,
     include_domains: list = None,
     exclude_domains: list = None,
     policy_text: str = None,
@@ -140,3 +140,10 @@ def clear_search_cache():
     global _search_cache
     _search_cache.clear()
     logger.info("Tavily search cache cleared.")
+
+async def get_cached_web_context_async(policy_text: str, query_type: str) -> str:
+    """
+    Asynchronously retrieve or perform a targeted search using asyncio.to_thread.
+    """
+    import asyncio
+    return await asyncio.to_thread(get_cached_web_context, policy_text, query_type)

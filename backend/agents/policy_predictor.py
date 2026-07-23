@@ -14,8 +14,10 @@ from datetime import datetime, timedelta
 import json
 import os
 from pathlib import Path
+import asyncio
 
-from app.services.gemini_service import generate, response_text
+from rag.gemini_client import generate_async
+from app.services.gemini_service import response_text
 
 
 # ─────────────────────────────────────────────
@@ -85,15 +87,15 @@ class PolicyPredictionEngine:
     def _ensure_model(self):
         pass
     
-    def predict_financial_impact(self, policy_text: str, 
-                                historical_context: str = "",
-                                web_context: str = "") -> FinancialImpact:
+    async def predict_financial_impact(self, policy_text: str, 
+                                 historical_context: str = "",
+                                 web_context: str = "") -> FinancialImpact:
         """Predict financial gain/loss from policy"""
         
         if not web_context:
             try:
-                from rag.tavily_client import get_cached_web_context
-                web_context = get_cached_web_context(policy_text, "general")
+                from rag.tavily_client import get_cached_web_context_async
+                web_context = await get_cached_web_context_async(policy_text, "general")
             except Exception:
                 web_context = ""
 
@@ -129,7 +131,7 @@ IMPORTANT:
 - Assume 5% effective policy implementation rate (India avg)
 """
         
-        response = generate(prompt)
+        response = await generate_async(prompt)
         text = response_text(response)
         impact_data = self._parse_json_response(text)
         
@@ -146,15 +148,15 @@ IMPORTANT:
             assumptions=impact_data.get("key_assumptions", [])
         )
     
-    def predict_demographic_impact(self, policy_text: str,
+    async def predict_demographic_impact(self, policy_text: str,
                                   income_class: str,
                                   web_context: str = "") -> DemographicImpact:
         """Predict impact segmented by income class"""
         
         if not web_context:
             try:
-                from rag.tavily_client import get_cached_web_context
-                web_context = get_cached_web_context(policy_text, "general")
+                from rag.tavily_client import get_cached_web_context_async
+                web_context = await get_cached_web_context_async(policy_text, "general")
             except Exception:
                 web_context = ""
 
@@ -199,7 +201,7 @@ Focus on:
 - Access to services
 - Savings capacity """
         
-        response = generate(prompt)
+        response = await generate_async(prompt)
         text = response_text(response)
         impact_data = self._parse_json_response(text)
         
@@ -213,15 +215,15 @@ Focus on:
                        [f"NEGATIVE: {x}" for x in impact_data.get("key_negative_impacts", [])]
         )
     
-    def project_future_impact(self, policy_text: str, 
+    async def project_future_impact(self, policy_text: str, 
                              years: int = 5,
                              web_context: str = "") -> List[FutureProjection]:
         """Project policy impact over 5-10 years"""
         
         if not web_context:
             try:
-                from rag.tavily_client import get_cached_web_context
-                web_context = get_cached_web_context(policy_text, "general")
+                from rag.tavily_client import get_cached_web_context_async
+                web_context = await get_cached_web_context_async(policy_text, "general")
             except Exception:
                 web_context = ""
 
@@ -254,7 +256,7 @@ Consider:
 
 Assume implementation starting Year 1 at 70% effectiveness, reaching 95% by Year 3."""
         
-        response = generate(prompt)
+        response = await generate_async(prompt)
         text = response_text(response)
         projections_data = self._parse_json_array(text)
         
@@ -270,30 +272,41 @@ Assume implementation starting Year 1 at 70% effectiveness, reaching 95% by Year
         
         return projections
     
-    def comprehensive_policy_analysis(self, policy_text: str,
+    async def comprehensive_policy_analysis(self, policy_text: str,
                                      historical_context: str = "",
                                      web_context: str = "") -> PolicyAnalysis:
         """Full analysis: financial + demographic + future"""
         
         if not web_context:
             try:
-                from rag.tavily_client import get_cached_web_context
-                web_context = get_cached_web_context(policy_text, "general")
+                from rag.tavily_client import get_cached_web_context_async
+                web_context = await get_cached_web_context_async(policy_text, "general")
             except Exception:
                 web_context = ""
 
         print("🔍 Analyzing policy comprehensively...")
-        print("  → Financial impact prediction...")
-        financial = self.predict_financial_impact(policy_text, historical_context, web_context)
         
-        print("  → Demographic segmentation...")
-        demographic_impacts = []
-        for income_class in ["upper", "middle", "lower_middle", "bpl"]:
-            demo = self.predict_demographic_impact(policy_text, income_class, web_context)
-            demographic_impacts.append(demo)
+        # Dispatch predictions in parallel concurrently!
+        financial_task = self.predict_financial_impact(policy_text, historical_context, web_context)
         
-        print("  → Future impact projections...")
-        future_projections = self.project_future_impact(policy_text, years=5, web_context=web_context)
+        demo_tasks = [
+            self.predict_demographic_impact(policy_text, income_class, web_context)
+            for income_class in ["upper", "middle", "lower_middle", "bpl"]
+        ]
+        
+        future_task = self.project_future_impact(policy_text, years=5, web_context=web_context)
+        
+        # Concurrently gather all 3 prediction streams
+        print("  → Dispatching predictions concurrently...")
+        results = await asyncio.gather(
+            financial_task,
+            asyncio.gather(*demo_tasks),
+            future_task
+        )
+        
+        financial = results[0]
+        demographic_impacts = list(results[1])
+        future_projections = results[2]
         
         # Aggregate beneficiaries/sufferers
         main_beneficiaries = [

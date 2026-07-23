@@ -1,7 +1,8 @@
-from app.services.gemini_service import generate, response_text
+from rag.gemini_client import generate_async
+from app.services.gemini_service import response_text
 
 
-def social_agent(state: dict, web_context: str = "") -> dict:
+async def social_agent(state: dict, web_context: str = "") -> dict:
     """
     Analyze social impact of policy on different Indian population segments
     
@@ -20,8 +21,8 @@ def social_agent(state: dict, web_context: str = "") -> dict:
         web_context = state.get("web_contexts", {}).get("news_conflict", "")
     if not web_context:
         try:
-            from rag.tavily_client import get_cached_web_context
-            web_context = get_cached_web_context(policy_text, "news_conflict")
+            from rag.tavily_client import get_cached_web_context_async
+            web_context = await get_cached_web_context_async(policy_text, "news_conflict")
         except Exception:
             web_context = ""
 
@@ -40,7 +41,7 @@ MIDDLE_CLASS_IMPACT:
 LOWER_INCOME_IMPACT:
 LIFESTYLE_CHANGES:"""
 
-    response = response_text(generate(prompt))
+    response = response_text(await generate_async(prompt))
     
     result = {
         "social_analysis": response,
@@ -63,5 +64,5 @@ def _extract_section(text: str, section: str) -> str:
         if end == -1:
             end = len(text)
         return text[start:end].strip()
-    except:
+    except Exception:
         return ""

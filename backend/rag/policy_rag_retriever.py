@@ -70,3 +70,46 @@ class PolicyRAGRetriever:
         query = f"demographic impact on {income_class} groups for {policy_topic}"
         results = self._search(query, k=k)
         return self._format_results(policy_topic, results, "Demographic context")
+
+    def enhance_policy_with_context(self, policy_text: str) -> str:
+        """Helper to get a combination of historical contexts"""
+        # Generate generic search queries
+        precedents = self.retrieve_historical_precedents(policy_text[:100])
+        financial = self.retrieve_financial_context(policy_text[:100])
+        return f"{precedents}\n\n{financial}"
+
+def analyze_policy_with_rag(policy_text: str) -> dict:
+    """Analyze policy with RAG and prediction engine"""
+    from agents.policy_predictor import PolicyPredictionEngine
+    from rag.policy_rag_retriever import PolicyRAGRetriever
+    import asyncio
+    import concurrent.futures
+    
+    retriever = PolicyRAGRetriever()
+    enhanced_context = retriever.enhance_policy_with_context(policy_text)
+    
+    predictor = PolicyPredictionEngine()
+    
+    # Run the comprehensive analysis using a self-contained helper
+    coro = predictor.comprehensive_policy_analysis(
+        policy_text=policy_text,
+        historical_context=enhanced_context,
+        web_context=""
+    )
+    
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+        
+    if loop is not None and loop.is_running():
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(lambda: asyncio.run(coro))
+            analysis = future.result()
+    else:
+        analysis = asyncio.run(coro)
+    
+    return {
+        "analysis": analysis,
+        "report": f"RAG-enhanced analysis completed for: {policy_text[:100]}"
+    }
