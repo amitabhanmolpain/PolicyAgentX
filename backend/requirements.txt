@@ -31,3 +31,4 @@ pymupdf
 pandas==2.2.3
 nltk==3.9.1
 typing_extensions
+tavily-python==0.7.26

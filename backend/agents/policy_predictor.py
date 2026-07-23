@@ -110,9 +110,17 @@ class PolicyPredictionEngine:
         return self.model
     
     def predict_financial_impact(self, policy_text: str, 
-                                historical_context: str = "") -> FinancialImpact:
+                                historical_context: str = "",
+                                web_context: str = "") -> FinancialImpact:
         """Predict financial gain/loss from policy"""
         
+        if not web_context:
+            try:
+                from rag.tavily_client import get_cached_web_context
+                web_context = get_cached_web_context(policy_text, "general")
+            except Exception:
+                web_context = ""
+
         prompt = f"""You are an expert policy economist analyzing Indian government policies.
 
 Policy to analyze:
@@ -120,6 +128,9 @@ Policy to analyze:
 
 Historical context:
 {historical_context}
+
+Real-world precedent (Tavily):
+{web_context}
 
 Analyze the financial impact and provide EXACT NUMBERS:
 
@@ -159,9 +170,17 @@ IMPORTANT:
         )
     
     def predict_demographic_impact(self, policy_text: str,
-                                  income_class: str) -> DemographicImpact:
+                                  income_class: str,
+                                  web_context: str = "") -> DemographicImpact:
         """Predict impact segmented by income class"""
         
+        if not web_context:
+            try:
+                from rag.tavily_client import get_cached_web_context
+                web_context = get_cached_web_context(policy_text, "general")
+            except Exception:
+                web_context = ""
+
         income_data = {
             "upper": {"population_share": 0.05, "income_range": "₹50L+"},
             "middle": {"population_share": 0.20, "income_range": "₹15-50L"},
@@ -176,6 +195,9 @@ IMPORTANT:
 
 Policy:
 {policy_text}
+
+Real-world precedent (Tavily):
+{web_context}
 
 Income Class Details:
 - Income Range: {class_data.get('income_range')}
@@ -212,13 +234,24 @@ Focus on:
         )
     
     def project_future_impact(self, policy_text: str, 
-                             years: int = 5) -> List[FutureProjection]:
+                             years: int = 5,
+                             web_context: str = "") -> List[FutureProjection]:
         """Project policy impact over 5-10 years"""
         
+        if not web_context:
+            try:
+                from rag.tavily_client import get_cached_web_context
+                web_context = get_cached_web_context(policy_text, "general")
+            except Exception:
+                web_context = ""
+
         prompt = f"""Project the impact of this policy over the next {years} years.
 
 Policy:
 {policy_text}
+
+Real-world precedent (Tavily):
+{web_context}
 
 Provide year-by-year projections in JSON array format:
 [
@@ -257,21 +290,29 @@ Assume implementation starting Year 1 at 70% effectiveness, reaching 95% by Year
         return projections
     
     def comprehensive_policy_analysis(self, policy_text: str,
-                                     historical_context: str = "") -> PolicyAnalysis:
+                                     historical_context: str = "",
+                                     web_context: str = "") -> PolicyAnalysis:
         """Full analysis: financial + demographic + future"""
         
+        if not web_context:
+            try:
+                from rag.tavily_client import get_cached_web_context
+                web_context = get_cached_web_context(policy_text, "general")
+            except Exception:
+                web_context = ""
+
         print("🔍 Analyzing policy comprehensively...")
         print("  → Financial impact prediction...")
-        financial = self.predict_financial_impact(policy_text, historical_context)
+        financial = self.predict_financial_impact(policy_text, historical_context, web_context)
         
         print("  → Demographic segmentation...")
         demographic_impacts = []
         for income_class in ["upper", "middle", "lower_middle", "bpl"]:
-            demo = self.predict_demographic_impact(policy_text, income_class)
+            demo = self.predict_demographic_impact(policy_text, income_class, web_context)
             demographic_impacts.append(demo)
         
         print("  → Future impact projections...")
-        future_projections = self.project_future_impact(policy_text, years=5)
+        future_projections = self.project_future_impact(policy_text, years=5, web_context=web_context)
         
         # Aggregate beneficiaries/sufferers
         main_beneficiaries = [
@@ -315,7 +356,7 @@ Assume implementation starting Year 1 at 70% effectiveness, reaching 95% by Year
             end = text.rfind('}') + 1
             if start >= 0 and end > start:
                 return json.loads(text[start:end])
-        except:
+        except Exception:
             pass
         return {}
     
@@ -326,7 +367,7 @@ Assume implementation starting Year 1 at 70% effectiveness, reaching 95% by Year
             end = text.rfind(']') + 1
             if start >= 0 and end > start:
                 return json.loads(text[start:end])
-        except:
+        except Exception:
             pass
         return []
     

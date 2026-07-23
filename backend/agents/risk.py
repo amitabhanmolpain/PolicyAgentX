@@ -1,12 +1,13 @@
 from app.services.gemini_service import generate, response_text
 
 
-def risk_agent(state: dict) -> dict:
+def risk_agent(state: dict, web_context: str = "") -> dict:
     """
     Analyze protest risk and public reaction to policy in India
     
     Args:
         state: Policy state with policy_text and region
+        web_context: Optional Web context from search APIs
     
     Returns:
         Dictionary with risk assessment and protest likelihood
@@ -17,6 +18,15 @@ def risk_agent(state: dict) -> dict:
     historical_cases = state.get("historical_protest_cases", [])
     baseline_score = int(state.get("protest_risk_score", 5) or 5)
     
+    if not web_context:
+        web_context = state.get("web_contexts", {}).get("news_conflict", "")
+    if not web_context:
+        try:
+            from rag.tavily_client import get_cached_web_context
+            web_context = get_cached_web_context(policy_text, "news_conflict")
+        except Exception:
+            web_context = ""
+            
     prompt = f"""⚠️ CRITICAL: This analysis is STRICTLY FOR INDIAN GOVERNMENT POLICIES ONLY.
 
 You are a political risk analyst specializing exclusively in Indian public sentiment, social movements, and protest dynamics in India.
@@ -24,8 +34,11 @@ You are a political risk analyst specializing exclusively in Indian public senti
 Policy: {policy_text}
 Analysis Region: India (NOT any other country - analyze ONLY Indian context)
 
-Historical Protest Context from RAG:
+Historical Protest Context from ChromaDB (Historical PDF Retrieval):
 {rag_context}
+
+Current News, Protests, and Public Unrest Context (Tavily):
+{web_context}
 
 Historical Protest Cases:
 {historical_cases}
@@ -58,8 +71,8 @@ Conduct a PROTEST RISK ANALYSIS for India. Assess the likelihood of public prote
 4. **Confidence Score**: How confident are you in this assessment for India? (70-95% confidence based on Indian political precedent)
 
 5. **Protest Risk Score (1-10)**:
-    - Use 1 for very low protest risk and 10 for extreme protest risk.
-    - Baseline from retrieval heuristic: {baseline_score}
+     - Use 1 for very low protest risk and 10 for extreme protest risk.
+     - Baseline from retrieval heuristic: {baseline_score}
 
 Be extremely specific with examples from INDIAN history ONLY. Extract only Indian precedents.
 

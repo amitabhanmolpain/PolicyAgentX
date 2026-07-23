@@ -44,7 +44,9 @@ def initialize_state(policy_text: str, region: str = "India") -> PolicyState:
 
 def run_economic_analysis(state: PolicyState) -> PolicyState:
     """Run economic agent and update state"""
-    result = economic_agent(state)
+    from rag.tavily_client import get_cached_web_context
+    web_context = get_cached_web_context(state.get("policy_text", ""), "economic")
+    result = economic_agent(state, web_context=web_context)
     state["economic_analysis"] = result
     return state
 
@@ -58,35 +60,45 @@ def run_rag_retrieval(state: PolicyState) -> PolicyState:
 
 def run_social_analysis(state: PolicyState) -> PolicyState:
     """Run social agent and update state"""
-    result = social_agent(state)
+    from rag.tavily_client import get_cached_web_context
+    web_context = get_cached_web_context(state.get("policy_text", ""), "news_conflict")
+    result = social_agent(state, web_context=web_context)
     state["social_analysis"] = result
     return state
 
 
 def run_business_analysis(state: PolicyState) -> PolicyState:
     """Run business agent and update state"""
-    result = business_agent(state)
+    from rag.tavily_client import get_cached_web_context
+    web_context = get_cached_web_context(state.get("policy_text", ""), "general")
+    result = business_agent(state, web_context=web_context)
     state["business_analysis"] = result
     return state
 
 
 def run_government_analysis(state: PolicyState) -> PolicyState:
     """Run government agent and update state"""
-    result = government_agent(state)
+    from rag.tavily_client import get_cached_web_context
+    web_context = get_cached_web_context(state.get("policy_text", ""), "government")
+    result = government_agent(state, web_context=web_context)
     state["government_analysis"] = result
     return state
 
 
 def run_risk_analysis(state: PolicyState) -> PolicyState:
     """Run risk agent and update state"""
-    result = risk_agent(state)
+    from rag.tavily_client import get_cached_web_context
+    web_context = get_cached_web_context(state.get("policy_text", ""), "news_conflict")
+    result = risk_agent(state, web_context=web_context)
     state["risk_analysis"] = result
     return state
 
 
 def run_recommendation(state: PolicyState) -> PolicyState:
     """Run recommendation agent and update state"""
-    result = recommend_policy(state)
+    from rag.tavily_client import get_cached_web_context
+    web_context = get_cached_web_context(state.get("policy_text", ""), "general")
+    result = recommend_policy(state, web_context=web_context)
     state["recommendation"] = result
     return state
 

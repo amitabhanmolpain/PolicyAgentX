@@ -97,33 +97,53 @@ class RAGAgentOrchestrator:
             rag_context=rag_context
         )
         
+        # Step 1.5: Targeted Tavily searches
+        print("🔍 Step 1.5: Pre-fetching Tavily Web Contexts...")
+        web_contexts = {}
+        try:
+            from rag.tavily_client import get_cached_web_context
+            web_contexts = {
+                "general": get_cached_web_context(policy_description, "general"),
+                "government": get_cached_web_context(policy_description, "government"),
+                "economic": get_cached_web_context(policy_description, "economic"),
+                "news_conflict": get_cached_web_context(policy_description, "news_conflict")
+            }
+        except Exception as e:
+            print(f"⚠ Warning: Tavily searches pre-fetch failed: {e}")
+            web_contexts = {
+                "general": "",
+                "government": "",
+                "economic": "",
+                "news_conflict": ""
+            }
+        
         # Step 2: Financial Agent Analysis
         print("\n💰 Step 2: Financial Agent Analysis...")
-        agent_context.financial_analysis = self._run_financial_agent(agent_context)
+        agent_context.financial_analysis = self._run_financial_agent(agent_context, web_contexts)
         
         # Step 3: Demographic Agent Analysis
         print("\n👥 Step 3: Demographic Agent Analysis...")
-        agent_context.demographic_analysis = self._run_demographic_agent(agent_context)
+        agent_context.demographic_analysis = self._run_demographic_agent(agent_context, web_contexts)
         
         # Step 4: Social Impact Agent Analysis
         print("\n🏛️  Step 4: Social Impact Agent Analysis...")
-        agent_context.social_impact = self._run_social_agent(agent_context)
+        agent_context.social_impact = self._run_social_agent(agent_context, web_contexts)
         
         # Step 5: Economic Agent Analysis
         print("\n📊 Step 5: Economic Agent Analysis...")
-        agent_context.economic_impact = self._run_economic_agent(agent_context)
+        agent_context.economic_impact = self._run_economic_agent(agent_context, web_contexts)
         
         # Step 6: Business Agent Analysis
         print("\n🏢 Step 6: Business Agent Analysis...")
-        agent_context.business_impact = self._run_business_agent(agent_context)
+        agent_context.business_impact = self._run_business_agent(agent_context, web_contexts)
         
         # Step 7: Risk Agent Analysis
         print("\n⚠️  Step 7: Risk Assessment Agent...")
-        agent_context.risk_factors = self._run_risk_agent(agent_context)
+        agent_context.risk_factors = self._run_risk_agent(agent_context, web_contexts)
         
         # Step 8: Government Coordination
         print("\n🏛️  Step 8: Government Coordination...")
-        agent_context.government_coordination = self._run_government_agent(agent_context)
+        agent_context.government_coordination = self._run_government_agent(agent_context, web_contexts)
         
         # Step 9: Compile final report
         print("\n📋 Step 9: Compiling Final Report...")
@@ -131,7 +151,7 @@ class RAGAgentOrchestrator:
         
         return final_report
     
-    def _run_financial_agent(self, context: AgentContext) -> Dict[str, Any]:
+    def _run_financial_agent(self, context: AgentContext, web_contexts: dict) -> Dict[str, Any]:
         """Financial agent analyzes revenue, cost, and economic impact"""
         
         if not self.predictor:
@@ -147,7 +167,8 @@ class RAGAgentOrchestrator:
             # Predict financial impact
             impact = self.predictor.predict_financial_impact(
                 policy_text=context.policy_description,
-                historical_context=financial_data.get("context", "")
+                historical_context=financial_data.get("context", ""),
+                web_context=web_contexts.get("general", "")
             )
             
             return {
@@ -162,7 +183,7 @@ class RAGAgentOrchestrator:
         except Exception as e:
             return {"error": f"Financial analysis failed: {e}"}
     
-    def _run_demographic_agent(self, context: AgentContext) -> Dict[str, Any]:
+    def _run_demographic_agent(self, context: AgentContext, web_contexts: dict) -> Dict[str, Any]:
         """Demographic agent analyzes impact on different income classes"""
         
         if not self.predictor:
@@ -177,6 +198,7 @@ class RAGAgentOrchestrator:
                 impact = self.predictor.predict_demographic_impact(
                     policy_text=context.policy_description,
                     income_class=income_class,
+                    web_context=web_contexts.get("general", "")
                 )
                 demographic_breakdown.append({
                     "income_class": impact.income_class,
@@ -199,33 +221,21 @@ class RAGAgentOrchestrator:
         except Exception as e:
             return {"error": f"Demographic analysis failed: {e}"}
     
-    def _run_social_agent(self, context: AgentContext) -> Dict[str, Any]:
+    def _run_social_agent(self, context: AgentContext, web_contexts: dict) -> Dict[str, Any]:
         """Social agent analyzes social welfare, education, health impacts"""
         
         try:
-            social_context = context.rag_context.get("government_context", [])
-            
-            # Analyze social aspects from government data
-            social_analysis = {
-                "status": "✓ Complete",
-                "welfare_impact": {
-                    "mgnrega_alignment": self._check_alignment(context.policy_description, "MGNREGA"),
-                    "education_impact": self._check_impact_area(context.policy_description, ["education", "skill", "training"]),
-                    "health_impact": self._check_impact_area(context.policy_description, ["health", "medical", "wellness"])
-                },
-                "inclusion_metrics": {
-                    "scs_coverage": self._estimate_coverage(context.policy_description, "SC/ST"),
-                    "minority_coverage": self._estimate_coverage(context.policy_description, "minorities"),
-                    "women_empowerment": self._estimate_coverage(context.policy_description, "women")
-                },
-                "historical_precedents": [p for p in social_context if "outcome" in str(p).lower()][:3]
+            from agents.social import social_agent
+            state = {
+                "policy_text": context.policy_description,
+                "region": "India",
+                "rag_context": context.rag_context.get("government_context", "")
             }
-            
-            return social_analysis
+            return social_agent(state, web_context=web_contexts.get("news_conflict", ""))
         except Exception as e:
             return {"error": f"Social analysis failed: {e}"}
     
-    def _run_economic_agent(self, context: AgentContext) -> Dict[str, Any]:
+    def _run_economic_agent(self, context: AgentContext, web_contexts: dict) -> Dict[str, Any]:
         """Economic agent analyzes GDP, employment, inflation impacts"""
         
         if not self.predictor:
@@ -236,6 +246,7 @@ class RAGAgentOrchestrator:
             impact = self.predictor.project_future_impact(
                 policy_text=context.policy_description,
                 years=5,
+                web_context=web_contexts.get("economic", "")
             )
             
             # Format projections
@@ -256,19 +267,39 @@ class RAGAgentOrchestrator:
                 long_term_outlook = "Negative"
             else:
                 long_term_outlook = "Stable"
+                
+            from agents.economic import economic_agent
+            state = {
+                "policy_text": context.policy_description,
+                "region": "India",
+                "rag_context": context.rag_context.get("economic_context", "")
+            }
+            agent_res = economic_agent(state, web_context=web_contexts.get("economic", ""))
             
             return {
                 "status": "✓ Complete",
                 "5_year_projections": projections,
                 "long_term_outlook": long_term_outlook,
+                "gdp_impact": agent_res.get("gdp_impact", ""),
+                "inflation_impact": agent_res.get("inflation_impact", ""),
+                "employment_impact": agent_res.get("employment_impact", ""),
+                "economic_analysis": agent_res.get("economic_analysis", "")
             }
         except Exception as e:
             return {"error": f"Economic analysis failed: {e}"}
     
-    def _run_business_agent(self, context: AgentContext) -> Dict[str, Any]:
+    def _run_business_agent(self, context: AgentContext, web_contexts: dict) -> Dict[str, Any]:
         """Business agent analyzes industry impact, competitiveness"""
         
         try:
+            from agents.business import business_agent
+            state = {
+                "policy_text": context.policy_description,
+                "region": "India",
+                "rag_context": context.rag_context.get("financial_context", "")
+            }
+            agent_res = business_agent(state, web_context=web_contexts.get("general", ""))
+            
             business_analysis = {
                 "status": "✓ Complete",
                 "industry_sectors": self._identify_affected_sectors(context.policy_description),
@@ -278,14 +309,18 @@ class RAGAgentOrchestrator:
                     "large_corp_impact": "Low" if "msme" in context.policy_description.lower() else "Medium",
                     "sme_focus": "Yes" if any(term in context.policy_description.lower() for term in ["msme", "small", "startup"]) else "No"
                 },
-                "implementation_timeline": self._estimate_timeline(context.policy_description)
+                "implementation_timeline": self._estimate_timeline(context.policy_description),
+                "small_business_impact_text": agent_res.get("small_business_impact", ""),
+                "large_industry_impact_text": agent_res.get("large_industry_impact", ""),
+                "supply_chain_impact_text": agent_res.get("supply_chain_impact", ""),
+                "business_analysis": agent_res.get("business_analysis", "")
             }
             
             return business_analysis
         except Exception as e:
             return {"error": f"Business analysis failed: {e}"}
     
-    def _run_risk_agent(self, context: AgentContext) -> List[str]:
+    def _run_risk_agent(self, context: AgentContext, web_contexts: dict) -> List[str]:
         """Risk agent identifies potential risks and mitigation strategies"""
         
         try:
@@ -308,15 +343,38 @@ class RAGAgentOrchestrator:
             # Add RAG-based risk factors
             if context.rag_context.get("economic_context"):
                 risk_factors.append("📊 Economic volatility: Current baseline shows market fluctuations")
+                
+            from agents.risk import risk_agent
+            state = {
+                "policy_text": context.policy_description,
+                "region": "India",
+                "rag_context": context.rag_context.get("historical_context", "") or context.rag_context.get("enhanced_context", ""),
+                "historical_protest_cases": context.rag_context.get("historical_protest_cases", []),
+                "protest_risk_score": 5
+            }
+            agent_res = risk_agent(state, web_context=web_contexts.get("news_conflict", ""))
+            
+            if agent_res:
+                risk_factors.append(f"🔥 Protest Likelihood (Tavily): {agent_res.get('protest_likelihood', 'MEDIUM')}")
+                risk_factors.append(f"📈 Protest Risk Score: {agent_res.get('protest_risk_score', 5)}/10")
+                risk_factors.append(f"👥 Affected Groups: {agent_res.get('affected_groups', '')[:100]}...")
             
             return risk_factors if risk_factors else ["✓ Low risk profile"]
         except Exception as e:
             return [f"Error: {e}"]
     
-    def _run_government_agent(self, context: AgentContext) -> Dict[str, Any]:
+    def _run_government_agent(self, context: AgentContext, web_contexts: dict) -> Dict[str, Any]:
         """Government coordination agent identifies stakeholders and alignment"""
         
         try:
+            from agents.government import government_agent
+            state = {
+                "policy_text": context.policy_description,
+                "region": "India",
+                "rag_context": context.rag_context.get("government_context", "")
+            }
+            agent_res = government_agent(state, web_context=web_contexts.get("government", ""))
+            
             gov_analysis = {
                 "status": "✓ Complete",
                 "relevant_ministries": self._identify_ministries(context.policy_description),
@@ -329,7 +387,11 @@ class RAGAgentOrchestrator:
                     "primary_stakeholders": self._identify_stakeholders(context.policy_description, "primary"),
                     "secondary_stakeholders": self._identify_stakeholders(context.policy_description, "secondary")
                 },
-                "rag_references": len(context.rag_context.get("government_context", []))
+                "rag_references": len(context.rag_context.get("government_context", [])),
+                "revenue_impact_text": agent_res.get("revenue_impact", ""),
+                "fiscal_deficit_impact_text": agent_res.get("fiscal_deficit_impact", ""),
+                "feasibility_text": agent_res.get("feasibility", ""),
+                "government_analysis": agent_res.get("government_analysis", "")
             }
             
             return gov_analysis

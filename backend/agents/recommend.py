@@ -1,12 +1,13 @@
 from app.services.gemini_service import generate, response_text
 
 
-def recommend_policy(state: dict) -> dict:
+def recommend_policy(state: dict, web_context: str = "") -> dict:
     """
     Generate optimized policy recommendations based on analysis
     
     Args:
         state: Policy state with policy_text and region
+        web_context: Optional Web context from search APIs
     
     Returns:
         Dictionary with policy recommendations
@@ -16,6 +17,15 @@ def recommend_policy(state: dict) -> dict:
     rag_context = state.get("rag_context", "")[:1800]
     historical_cases = state.get("historical_protest_cases", [])
     
+    if not web_context:
+        web_context = state.get("web_contexts", {}).get("general", "")
+    if not web_context:
+        try:
+            from rag.tavily_client import get_cached_web_context
+            web_context = get_cached_web_context(policy_text, "general")
+        except Exception:
+            web_context = ""
+            
     prompt = f"""⚠️ IMPORTANT: This analysis is STRICTLY FOR INDIAN GOVERNMENT POLICIES ONLY.
 
 You are a senior policy advisor to the Indian government with expertise exclusively in Indian socio-economic policy design.
@@ -28,6 +38,9 @@ Historical Protest Context from RAG:
 
 Historical Protest Cases:
 {historical_cases}
+
+Reference to Best Practices/Case Studies (Tavily):
+{web_context}
 
 Based on this policy for India, provide OPTIMIZED RECOMMENDATIONS for Indian government:
 

@@ -191,12 +191,18 @@ class RAGEnhancedOrchestratorAgent:
         policy_text = state.get("policy_text", "")
         context = state.get("financial_context", "")
         
+        from rag.tavily_client import get_cached_web_context
+        web_context = get_cached_web_context(policy_text, "general")
+        
         prompt = f"""You are a business policy analyst. Analyze this policy using provided context.
 
 POLICY: {policy_text}
 
-CONTEXT:
+RAG_CONTEXT:
 {context}
+
+WEB_CONTEXT:
+{web_context}
 
 Provide brief analysis on:
 1. SMALL_BUSINESS_IMPACT
@@ -222,12 +228,18 @@ Format: Each on one line, max 15 words."""
         policy_text = state.get("policy_text", "")
         context = state.get("economic_baseline", "")
         
+        from rag.tavily_client import get_cached_web_context
+        web_context = get_cached_web_context(policy_text, "economic")
+        
         prompt = f"""You are an economic analyst. Analyze this policy impact.
 
 POLICY: {policy_text}
 
 ECONOMIC_BASELINE:
 {context}
+
+WEB_CONTEXT:
+{web_context}
 
 Predict impact on:
 1. GDP_GROWTH
@@ -253,11 +265,17 @@ Format: Each on one line, max 15 words."""
         policy_text = state.get("policy_text", "")
         financial_impact = state.get("financial_impact", {})
         
+        from rag.tavily_client import get_cached_web_context
+        web_context = get_cached_web_context(policy_text, "government")
+        
         prompt = f"""You are a government finance analyst. Assess fiscal impact.
 
 POLICY: {policy_text}
 
 PREDICTED_REVENUE_IMPACT: ₹{financial_impact.get('net_impact', 'N/A')} Cr
+
+WEB_CONTEXT:
+{web_context}
 
 Assess:
 1. REVENUE_GENERATION
@@ -284,6 +302,9 @@ Format: Each on one line, max 15 words."""
         demographic_context = state.get("demographic_context", "")
         demographic_impact = state.get("demographic_impact", [])
         
+        from rag.tavily_client import get_cached_web_context
+        web_context = get_cached_web_context(policy_text, "news_conflict")
+        
         income_impacts = "\n".join([
             f"- {d.get('income_class')}: net benefit/person ₹{d.get('net_benefit_per_person', 'N/A')}"
             for d in demographic_impact
@@ -298,6 +319,9 @@ INCOME_CLASS_IMPACT:
 
 DEMOGRAPHIC_CONTEXT:
 {demographic_context}
+
+WEB_CONTEXT:
+{web_context}
 
 Evaluate:
 1. SOCIAL_EQUITY
