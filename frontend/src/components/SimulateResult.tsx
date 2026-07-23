@@ -248,7 +248,7 @@ function inferAffectedGroups(policyText: string, existing: AffectedGroupItem[]):
     }))
     .filter((g) => g.group_name.length > 2 && !/policy-related|unknown|generic/i.test(g.group_name || ""));
 
-  if (cleanedExisting.length >= 4) {
+  if (cleanedExisting.length > 0) {
     return cleanedExisting.slice(0, 8);
   }
 

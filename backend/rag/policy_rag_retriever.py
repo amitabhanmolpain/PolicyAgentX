@@ -71,6 +71,10 @@ class PolicyRAGRetriever:
         results = self._search(query, k=k)
         return self._format_results(policy_topic, results, "Demographic context")
 
+    def retrieve_economic_baseline(self, k: int = 3) -> str:
+        results = self._search("economic baseline indicators gdp inflation india", k=k)
+        return self._format_results("economic baseline", results, "Economic baseline")
+
     def enhance_policy_with_context(self, policy_text: str) -> str:
         """Helper to get a combination of historical contexts"""
         # Generate generic search queries

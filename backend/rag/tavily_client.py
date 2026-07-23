@@ -58,6 +58,7 @@ def fetch_web_context(
     try:
         client = get_tavily_client()
         logger.info(f"Calling Tavily API with query: '{query}'")
+        print(f"\n[TAVILY SEARCH QUERY]: '{query}'")
         
         context = client.get_search_context(
             query=query,
@@ -65,8 +66,10 @@ def fetch_web_context(
             include_domains=include_domains,
             exclude_domains=exclude_domains
         )
+        print(f"[TAVILY SEARCH RESPONSE PREVIEW (TRUNCATED)]: {context[:350]}...\n")
     except Exception as e:
         logger.error(f"Tavily API call failed for query '{query}': {e}", exc_info=True)
+        print(f"[TAVILY SEARCH ERROR]: Failed for query '{query}': {e}")
         context = ""
         
     if cache_key is not None:
