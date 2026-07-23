@@ -189,7 +189,9 @@ IMPORTANT:
         }
         
         class_data = income_data.get(income_class, {})
-        population = int(self.india_population * class_data.get("population_share", 0))
+        pop_share = class_data.get("population_share", 0.0)
+        share_val = float(pop_share) if isinstance(pop_share, (int, float)) else 0.0
+        population = int(self.india_population * share_val)
         
         prompt = f"""Analyze policy impact on {income_class.replace('_', ' ').upper()} class.
 
@@ -201,7 +203,7 @@ Real-world precedent (Tavily):
 
 Income Class Details:
 - Income Range: {class_data.get('income_range')}
-- Population: {population:,} people ({class_data.get('population_share')*100:.0f}% of India)
+- Population: {population:,} people ({share_val*100:.0f}% of India)
 
 Provide impact analysis in JSON:
 {{
