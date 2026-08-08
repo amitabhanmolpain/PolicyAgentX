@@ -40,7 +40,7 @@ def get_prompt_hash(prompt: str) -> str:
 
 def generate(
     prompt: str, 
-    model: str = "llama3-8b-8192", 
+    model: str = "llama-3.1-8b-instant", 
     temperature: float = None, 
     max_tokens: int = None
 ) -> str:
@@ -56,8 +56,8 @@ def generate(
         logger.info(f"Groq Cache Hit for model: {model}")
         return _groq_cache[cache_key]
         
-    retries = 3
-    delay = 1.0
+    retries = 4
+    delay = 12.0
     
     for attempt in range(retries):
         try:
@@ -92,7 +92,7 @@ def generate(
 
 async def generate_async(
     prompt: str, 
-    model: str = "llama3-8b-8192", 
+    model: str = "llama-3.1-8b-instant", 
     temperature: float = None, 
     max_tokens: int = None
 ) -> str:

@@ -129,11 +129,17 @@ class RAGEnhancedOrchestratorAgent:
         if not policy_text:
             return state
 
-        # Fetch Tavily web context for live search results
-        from rag.tavily_client import get_cached_web_context
-        web_context_general = get_cached_web_context(policy_text, "general")
-        web_context_economic = get_cached_web_context(policy_text, "economic")
-        web_context_conflict = get_cached_web_context(policy_text, "news_conflict")
+        web_context_general = ""
+        web_context_economic = ""
+        web_context_conflict = ""
+        try:
+            # Fetch Tavily web context for live search results
+            from rag.tavily_client import get_cached_web_context
+            web_context_general = get_cached_web_context(policy_text, "general")
+            web_context_economic = get_cached_web_context(policy_text, "economic")
+            web_context_conflict = get_cached_web_context(policy_text, "news_conflict")
+        except Exception as e:
+            print(f"Warning: Tavily search skipped due to error: {e}")
 
         rag_context = "\n\n".join([
             f"FINANCIAL_CONTEXT:\n{state.get('financial_context', '')}",
@@ -810,6 +816,34 @@ IMPORTANT:
             "protest_risk",
             "improvements",
         ]
+        
+        # Sane normalization if the model returns lists instead of dictionaries
+        affected_val = parsed.get("affected_groups")
+        if isinstance(affected_val, list):
+            parsed["affected_groups"] = {
+                "groups": affected_val,
+                "confidence_score": 75
+            }
+            
+        timeline_val = parsed.get("timeline")
+        if isinstance(timeline_val, list):
+            timeline_dict = {}
+            for i, item in enumerate(timeline_val):
+                key = f"year_{i+1}" if i == 0 else (f"year_2_3" if i == 1 else (f"year_5" if i == 2 else f"year_10"))
+                if isinstance(item, dict):
+                    timeline_dict[key] = item
+            timeline_dict["confidence_score"] = 75
+            parsed["timeline"] = timeline_dict
+
+        improvements_val = parsed.get("improvements")
+        if isinstance(improvements_val, list):
+            parsed["improvements"] = {
+                "three_bold_improvements": improvements_val[:3],
+                "lower_protest_risk_modified_version": "Phased implementation with direct feedback",
+                "phased_rollout_recommendation": "district-level pilot",
+                "confidence_score": 75
+            }
+
         fallback = self._default_deep_analysis("")
         out = {}
         for key in required:

@@ -36,14 +36,14 @@ def generate(prompt: str, temperature: float = 0.7, max_tokens: int = 2048) -> U
             initialize_groq()
         print("✅ Groq client initialized successfully")
 
-        print("📦 Model: llama3-8b-8192")
+        print("📦 Model: llama-3.1-8b-instant")
         print(f"📤 Sending prompt ({len(prompt)} characters)...")
 
         if _client is None:
             raise RuntimeError("Groq client is not initialized")
             
         response = _client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
             max_tokens=max_tokens,

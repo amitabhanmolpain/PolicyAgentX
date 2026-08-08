@@ -288,7 +288,7 @@ def _build_conflict_alert(policy_text: str, risk_score: int, rag_context: str, h
 
     # Use genuine LLM reasoning from risk_data if available
     if risk_data and isinstance(risk_data, dict) and "is_alert" in risk_data:
-        alert = bool(risk_data.get("is_alert", False))
+        alert = bool(risk_data.get("is_alert", False)) or risk_score >= 70
     else:
         # Fallback keyword matching for extreme language
         severe_terms = ["ban all", "expel all", "restrict all", "discriminate against"]

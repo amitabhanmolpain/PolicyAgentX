@@ -98,7 +98,7 @@ JSON structure:
   "severity": "<"low" or "moderate" or "high" or "severe">"
 }}
 
-Note: Set "is_alert" to true if the severity is "high" or "severe" (such as outright bans or restrictions targeting specific groups)."""
+Note: Set "is_alert" to true if the severity is "high" or "severe", OR if the policy is likely to trigger protests, strikes, unrest, civil disobedience, or significant public opposition."""
 
     raw_response = response_text(await generate_async(prompt, temperature=0.2, max_tokens=2048))
     
@@ -114,9 +114,9 @@ Note: Set "is_alert" to true if the severity is "high" or "severe" (such as outr
     if severity not in ["low", "moderate", "high", "severe"]:
         severity = "moderate"
         
-    # Programmatic enforcement of is_alert for high/severe cases
+    # Programmatic enforcement of is_alert for high/severe cases or high scores
     is_alert = parsed_res.get("is_alert", False)
-    if severity in ["high", "severe"]:
+    if severity in ["high", "severe"] or risk_score >= 70:
         is_alert = True
         
     affected_groups = parsed_res.get("affected_groups", [])
