@@ -15,14 +15,14 @@ async def run_test():
     # Import components
     try:
         from agents.rag_agent_orchestrator import RAGAgentOrchestrator
-        from rag.gemini_client import clear_gemini_cache
+        from rag.groq_client import clear_groq_cache
         from rag.tavily_client import clear_search_cache
     except ImportError as e:
         print(f"[ERROR] Failed to import required components: {e}")
         return
         
     # Clear caches
-    clear_gemini_cache()
+    clear_groq_cache()
     clear_search_cache()
     
     orchestrator = RAGAgentOrchestrator()

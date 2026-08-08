@@ -1,8 +1,8 @@
 import json
 import re
 import logging
-from rag.gemini_client import generate_async
-from app.services.gemini_service import response_text
+from rag.groq_client import generate_async
+from app.services.groq_service import response_text
 
 logger = logging.getLogger(__name__)
 

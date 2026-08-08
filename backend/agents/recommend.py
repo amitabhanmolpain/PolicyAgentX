@@ -1,5 +1,5 @@
-from rag.gemini_client import generate_async
-from app.services.gemini_service import response_text
+from rag.groq_client import generate_async
+from app.services.groq_service import response_text
 
 
 async def recommend_policy(state: dict, web_context: str = "") -> dict:

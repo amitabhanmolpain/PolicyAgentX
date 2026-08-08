@@ -2,10 +2,8 @@ Flask==2.3.2
 flask-cors==4.0.0
 python-dotenv==1.0.0
 
-# Gemini / Google AI
-google-genai
-google-cloud-aiplatform
-vertexai
+# Groq AI
+groq
 
 # LangGraph
 langgraph==1.1.4

@@ -16,8 +16,8 @@ import os
 from pathlib import Path
 import asyncio
 
-from rag.gemini_client import generate_async
-from app.services.gemini_service import response_text
+from rag.groq_client import generate_async
+from app.services.groq_service import response_text
 
 def safe_float(val, default=0.0) -> float:
     if val is None:

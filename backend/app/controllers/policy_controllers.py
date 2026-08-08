@@ -933,7 +933,7 @@ def handle_improve_policy(data):
         gemini_error = None
 
         try:
-            from app.services.gemini_service import generate, is_error_response
+            from app.services.groq_service import generate, is_error_response
 
             improvement_prompt = f"""
 You are India's best policy economist and architect. Think DEEPLY about real constraints, tradeoffs, and unintended consequences.
@@ -1037,7 +1037,7 @@ Be intellectually rigorous. Show you understand real tradeoffs, fiscal algebra, 
         # Build AI compare intelligence so frontend is not forced to synthesize hardcoded text.
         compare_intelligence = {}
         try:
-            from app.services.gemini_service import generate, is_error_response
+            from app.services.groq_service import generate, is_error_response
 
             intelligence_prompt = f"""
 You are a senior Indian policy economist and evaluator with deep domain expertise.

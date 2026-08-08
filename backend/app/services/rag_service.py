@@ -12,7 +12,7 @@ import chromadb
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
-from app.services.gemini_service import generate, is_error_response, response_text
+from app.services.groq_service import generate, is_error_response, response_text
 from rag.src.pipeline import RAGPipeline
 
 logger = logging.getLogger(__name__)
