@@ -23,7 +23,7 @@ def initialize_groq():
 
     _client = Groq(api_key=api_key)
 
-def generate(prompt: str, temperature: float = 0.7, max_tokens: int = 2048) -> Union[str, Dict[str, str]]:
+def generate(prompt: str, temperature: float = 0.7, max_tokens: int = 800) -> Union[str, Dict[str, str]]:
     """Generate response from Groq using GROQ_API_KEY"""
     global _client
 

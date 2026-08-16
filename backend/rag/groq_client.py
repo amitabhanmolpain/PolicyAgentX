@@ -67,7 +67,9 @@ def generate(
             kwargs = {}
             if temperature is not None:
                 kwargs["temperature"] = temperature
-            if max_tokens is not None:
+            if max_tokens is None:
+                kwargs["max_tokens"] = 800
+            else:
                 kwargs["max_tokens"] = max_tokens
                 
             response = client.chat.completions.create(

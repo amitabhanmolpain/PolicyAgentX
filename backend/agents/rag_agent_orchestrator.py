@@ -132,13 +132,14 @@ class RAGAgentOrchestrator:
         business_task = self._run_business_agent(agent_context, web_contexts)
         government_task = self._run_government_agent(agent_context, web_contexts)
         
-        domain_results = await asyncio.gather(
-            social_task,
-            economic_task,
-            business_task,
-            government_task,
-            return_exceptions=True
-        )
+        domain_results = []
+        for task in [social_task, economic_task, business_task, government_task]:
+            try:
+                res = await task
+                domain_results.append(res)
+            except Exception as e:
+                domain_results.append(e)
+            await asyncio.sleep(2) # Avoid TPM limit bursts
         
         agent_context.social_impact = domain_results[0] if not isinstance(domain_results[0], Exception) else {"error": f"Social agent failed: {domain_results[0]}"}
         agent_context.economic_impact = domain_results[1] if not isinstance(domain_results[1], Exception) else {"error": f"Economic agent failed: {domain_results[1]}"}
@@ -151,11 +152,15 @@ class RAGAgentOrchestrator:
         financial_task = self._run_financial_agent(agent_context, web_contexts)
         demographic_task = self._run_demographic_agent(agent_context, web_contexts)
         
-        downstream_results = await asyncio.gather(
-            financial_task,
-            demographic_task,
-            return_exceptions=True
-        )
+        downstream_results = []
+        for task in [financial_task, demographic_task]:
+            try:
+                res = await task
+                downstream_results.append(res)
+            except Exception as e:
+                downstream_results.append(e)
+            await asyncio.sleep(2) # Avoid TPM limit bursts
+
         agent_context.financial_analysis = downstream_results[0] if not isinstance(downstream_results[0], Exception) else {"error": f"Financial prediction failed: {downstream_results[0]}"}
         agent_context.demographic_analysis = downstream_results[1] if not isinstance(downstream_results[1], Exception) else {"error": f"Demographic prediction failed: {downstream_results[1]}"}
         

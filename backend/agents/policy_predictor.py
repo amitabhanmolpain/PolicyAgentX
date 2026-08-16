@@ -130,7 +130,7 @@ Historical context:
 {historical_context}
 
 Real-world precedent (Tavily):
-{web_context}
+{web_context[:1000]}
 
 Analyze the financial impact and provide EXACT NUMBERS:
 
@@ -201,7 +201,7 @@ Policy:
 {policy_text}
 
 Real-world precedent (Tavily):
-{web_context}
+{web_context[:1000]}
 
 Income Class Details:
 - Income Range: {class_data.get('income_range')}
@@ -256,7 +256,7 @@ Policy:
 {policy_text}
 
 Real-world precedent (Tavily):
-{web_context}
+{web_context[:1000]}
 
 Provide year-by-year projections in JSON array format:
 [
@@ -320,16 +320,17 @@ Assume implementation starting Year 1 at 70% effectiveness, reaching 95% by Year
         future_task = self.project_future_impact(policy_text, years=5, web_context=web_context)
         
         # Concurrently gather all 3 prediction streams
-        print("  → Dispatching predictions concurrently...")
-        results = await asyncio.gather(
-            financial_task,
-            asyncio.gather(*demo_tasks),
-            future_task
-        )
+        print("  → Dispatching predictions sequentially to avoid rate limits...")
+        financial = await financial_task
         
-        financial = results[0]
-        demographic_impacts = list(results[1])
-        future_projections = results[2]
+        demographic_impacts = []
+        for task in demo_tasks:
+            demographic_impacts.append(await task)
+            await asyncio.sleep(2) # Avoid TPM limit bursts
+            
+        future_projections = await future_task
+        
+        
         
         # Aggregate beneficiaries/sufferers
         main_beneficiaries = [
