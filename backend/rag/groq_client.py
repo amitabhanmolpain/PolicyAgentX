@@ -40,7 +40,7 @@ def get_prompt_hash(prompt: str) -> str:
 
 def generate(
     prompt: str, 
-    model: str = "llama-3.1-8b-instant", 
+    model: str = "qwen/qwen3.6-27b", 
     temperature: float = None, 
     max_tokens: int = None
 ) -> str:
@@ -80,6 +80,9 @@ def generate(
             return result
             
         except Exception as e:
+            if hasattr(e, 'status_code') and e.status_code in (400, 401, 403, 404):
+                logger.error(f"Groq API call failed with unrecoverable error ({e.status_code}): {e}")
+                return ""
             if attempt < retries - 1:
                 logger.warning(f"Groq API call failed. Retrying in {delay:.1f}s... (Attempt {attempt+1}/{retries}). Error: {e}")
                 time.sleep(delay)
@@ -92,7 +95,7 @@ def generate(
 
 async def generate_async(
     prompt: str, 
-    model: str = "llama-3.1-8b-instant", 
+    model: str = "qwen/qwen3.6-27b", 
     temperature: float = None, 
     max_tokens: int = None
 ) -> str:
